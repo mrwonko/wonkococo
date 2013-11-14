@@ -1,11 +1,19 @@
 #ifndef COMPILERNAMEGOESHERE_REGEX_HPP_INCLUDED
 #define COMPILERNAMEGOESHERE_REGEX_HPP_INCLUDED
 
+#include <string>
+#include <sstream>
+#include <limits>
+
 namespace Regex
 {
 
+//			Types
+
 /**
 	@brief The empty regular language over a given alphabet
+
+	@todo Of no practical relevance? Delete?
 */
 template < typename Alphabet > struct EmptyLanguage
 {
@@ -82,6 +90,98 @@ template < typename language > struct Repeat
 {
 	typedef typename language::alphabet alphabet;
 	typedef language lang;
+};
+
+/**
+	@brief Capturing a word in a regular language
+
+	For evaluation - if you need read parts later, capture them. (E.g. identifiers.)
+*/
+template < typename language > struct Capture
+{
+	typedef typename language::alphabet alphabet;
+	typedef language lang;
+};
+
+//			Functions
+
+/**
+	@brief Convert a given RegEx to an std::string representation.
+
+	Captures are displayed as <...>
+
+	Use like this:
+	\code{.cpp}
+		std::cout << Regex::ToString< myLanguage >::run() << std::endl;
+	\endcode
+*/
+
+template < typename _ > struct ToString;
+
+template < typename Alphabet > struct ToString < EmptyLanguage < Alphabet > >
+{
+	static std::string run()
+	{
+		return "<empty language>";
+	}
+};
+
+template < typename Alphabet > struct ToString < EmptyWordLanguage < Alphabet > >
+{
+	static std::string run()
+	{
+		return "";
+	}
+};
+
+template < typename Alphabet, Alphabet letter > struct ToString < Letter < Alphabet, letter > >
+{
+	static std::string run()
+	{
+		std::stringstream ss;
+		ss << letter;
+		std::string s( ss.str() );
+		if( s == "|" || s == "(" || s == ")" || s == "." || s == "\\" || s == "<" || s == ">" || s == "*" )
+		{
+			return '\\' + s;
+		}
+		else
+		{
+			return s;
+		}
+	}
+};
+
+template < typename lang1, typename lang2 > struct ToString < Union < lang1, lang2 > >
+{
+	static std::string run()
+	{
+		return '(' + ToString< lang1 >::run() + ")|(" + ToString< lang2 >::run() + ')';
+	}
+};
+
+template < typename lang1, typename lang2 > struct ToString < Concat < lang1, lang2 > >
+{
+	static std::string run()
+	{
+		return '(' + ToString< lang1 >::run() + ").(" + ToString< lang2 >::run() + ')';
+	}
+};
+
+template < typename lang > struct ToString < Repeat < lang > >
+{
+	static std::string run()
+	{
+		return '(' + ToString< lang >::run() + ")*";
+	}
+};
+
+template < typename lang > struct ToString < Capture < lang > >
+{
+	static std::string run()
+	{
+		return '<' + ToString< lang >::run() + '>';
+	}
 };
 
 }

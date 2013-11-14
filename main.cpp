@@ -6,9 +6,19 @@
 int main(int argc, char** argv)
 {
 	typedef Regex::Union <
-		Regex::EmptyWordLanguage < char >,
-		Regex::Letter < char, 'W' >
+		Regex::Concat <
+			Regex::EmptyWordLanguage < char >,
+			Regex::EmptyLanguage< char > // concatenating the empty language with anything results in the empty language, but whatever, this is about printing.
+		>,
+		Regex::Capture <
+			Regex::Concat <
+				Regex::Letter < char, 'W' >,
+				Regex::Repeat <
+					Regex::Letter < char, '!' >
+				>
+			>
+		>
 	> myRegularLanguage;
-	std::cout << myRegularLanguage::lang2::letter << std::endl;
+	std::cout << Regex::ToString< myRegularLanguage >::run() << std::endl;
 	return EXIT_SUCCESS;
 }
