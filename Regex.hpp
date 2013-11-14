@@ -1,9 +1,13 @@
-#ifndef COMPILERNAMEGOESHERE_REGEX_HPP_INCLUDED
-#define COMPILERNAMEGOESHERE_REGEX_HPP_INCLUDED
+#ifndef WONKOCOCO_REGEX_HPP_INCLUDED
+#define WONKOCOCO_REGEX_HPP_INCLUDED
 
 #include <string>
 #include <sstream>
 #include <limits>
+#include "TemplateHelpers.hpp"
+
+namespace wcc
+{
 
 namespace Regex
 {
@@ -109,9 +113,9 @@ template < typename language > struct Capture
 	@brief Something optional
 
 	Usage:
-	\code{.cpp}
+	@code{.cpp}
 		typedef optional< lang1 >::type lang2;
-	\endcode
+	@endcode
 */
 template < typename language > struct Optional
 {
@@ -124,9 +128,9 @@ template < typename language > struct Optional
 	i.e. a-c == a|b|c
 
 	Usage:
-	\code{.cpp}
+	@code{.cpp}
 		typedef Range< char, 'a', 'z' >::type myLanguage;
-	\endcode
+	@endcode
 */
 template < typename Alphabet, Alphabet min, Alphabet max > struct Range
 {
@@ -145,9 +149,9 @@ template < typename Alphabet, Alphabet letter > struct Range < Alphabet, letter,
 	i.e. a{4} = aaaa
 
 	Usage:
-	\code{.cpp}
+	@code{.cpp}
 		typedef RepeateNTimes< language1, 5 >::type language2;
-	\endcode
+	@endcode
 */
 template < typename language, size_t repetitions > struct RepeatNTimes
 {
@@ -213,7 +217,22 @@ template < typename language > struct OnceOrMore
 	typedef Concat< language, Repeat< language > > type;
 };
 
-// TODO: Any, AnyBut
+/**
+	@brief Shorthand for any possible except these
+
+	You could write
+	@code{.cpp}
+		Concat< Range<char, 0, 'a'-1>::type, Range<char, 'a'+1, MAX_CHAR>::type>
+	@endcode
+	or
+	@code{.cpp}
+		AnyBut<char, 'a'>::type.
+	@endcode
+*/
+
+template < typename Alphabet, Alphabet... exceptions > struct AnyBut;
+// TODO
+// basic idea: iterate from std::numeric_limits< Alphabet >::min() to ...::max(), take those for which Helper::Contains<Cur, exceptions...>::value == false
 
 //			Functions
 
@@ -223,9 +242,9 @@ template < typename language > struct OnceOrMore
 	Captures are displayed as <...>
 
 	Use like this:
-	\code{.cpp}
+	@code{.cpp}
 		std::cout << Regex::ToString< myLanguage >::run() << std::endl;
-	\endcode
+	@endcode
 */
 
 template < typename _ > struct ToString;
@@ -295,6 +314,8 @@ template < typename lang > struct ToString < Capture < lang > >
 		return '<' + ToString< lang >::run() + '>';
 	}
 };
+
+}
 
 }
 

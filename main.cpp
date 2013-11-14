@@ -3,8 +3,11 @@
 
 #include "Regex.hpp"
 
+#include "TemplateHelpers.hpp"
+
 int main(int argc, char** argv)
 {
+	using namespace wcc;
 	typedef Regex::Union <
 		Regex::Concat <
 			Regex::EmptyWordLanguage < char >,
@@ -32,5 +35,10 @@ int main(int argc, char** argv)
 	std::cout << "a+: " << Regex::ToString<
 		Regex::OnceOrMore< Regex::Letter< char, 'a' > >::type
 	>::run() << std::endl;
+
+	// Testing Contains
+	std::cout << "false: " << Helper::Contains<int, char, double, int*>::value << std::endl;
+	std::cout << " true: " << Helper::Contains<int, char, double, int, bool>::value << std::endl;
+	std::cout << "false: " << Helper::Contains<int>::value << std::endl;
 	return EXIT_SUCCESS;
 }

@@ -8,4 +8,5 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 add_executable(compiler
 	main.cpp
 	Regex.hpp
+	TemplateHelpers.hpp
 	)
