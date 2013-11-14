@@ -208,6 +208,13 @@ template < typename language > struct RepeatFromTo < language, 0, 0 >
 	You could just write a|a*
 */
 
+template < typename language > struct OnceOrMore
+{
+	typedef Concat< language, Repeat< language > > type;
+};
+
+// TODO: Any, AnyBut
+
 //			Functions
 
 /**

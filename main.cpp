@@ -29,5 +29,8 @@ int main(int argc, char** argv)
 	std::cout << "2-4x z: " << Regex::ToString<
 		Regex::RepeatFromTo< Regex::Letter< char, 'z' >, 2, 4 >::type
 	>::run() << std::endl;
+	std::cout << "a+: " << Regex::ToString<
+		Regex::OnceOrMore< Regex::Letter< char, 'a' > >::type
+	>::run() << std::endl;
 	return EXIT_SUCCESS;
 }
