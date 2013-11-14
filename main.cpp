@@ -37,8 +37,13 @@ int main(int argc, char** argv)
 	>::run() << std::endl;
 
 	// Testing Contains
-	std::cout << "false: " << Helper::Contains<int, char, double, int*>::value << std::endl;
-	std::cout << " true: " << Helper::Contains<int, char, double, int, bool>::value << std::endl;
-	std::cout << "false: " << Helper::Contains<int>::value << std::endl;
+	std::cout << "Testing Helper::ContainsType" << std::endl;
+	std::cout << Helper::ContainsType<int, char, double, int*>::value << std::endl;
+	std::cout << Helper::ContainsType<int, char, double, int, bool>::value << std::endl;
+	std::cout << Helper::ContainsType<int>::value << std::endl;
+	std::cout << "Testing Helper::ContainsNumber" << std::endl;
+	std::cout << Helper::ContainsNumber<13, 4, 8>::value << std::endl;
+	std::cout << Helper::ContainsNumber<13, 4, 9, 2, 13, 5, 8>::value << std::endl;
+	std::cout << Helper::ContainsNumber<42>::value << std::endl;
 	return EXIT_SUCCESS;
 }
