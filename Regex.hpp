@@ -103,6 +103,111 @@ template < typename language > struct Capture
 	typedef language lang;
 };
 
+//			Convenience types
+
+/**
+	@brief Something optional
+
+	Usage:
+	\code{.cpp}
+		typedef optional< lang1 >::type lang2;
+	\endcode
+*/
+template < typename language > struct Optional
+{
+	typedef Union< EmptyWordLanguage < language >, language > type;
+};
+
+/**
+	@brief Shorthand for any of a continuous range of characters
+
+	i.e. a-c == a|b|c
+
+	Usage:
+	\code{.cpp}
+		typedef Range< char, 'a', 'z' >::type myLanguage;
+	\endcode
+*/
+template < typename Alphabet, Alphabet min, Alphabet max > struct Range
+{
+	static_assert( min < max, "Range minimum must be less than Range maximum" );
+	typedef Union< Letter< Alphabet, min >, typename Range< Alphabet, min + 1, max >::type > type;
+};
+
+template < typename Alphabet, Alphabet letter > struct Range < Alphabet, letter, letter >
+{
+	typedef Letter < Alphabet, letter > type;
+};
+
+/**
+	@brief Repeating something N times
+
+	i.e. a{4} = aaaa
+
+	Usage:
+	\code{.cpp}
+		typedef RepeateNTimes< language1, 5 >::type language2;
+	\endcode
+*/
+template < typename language, size_t repetitions > struct RepeatNTimes
+{
+	typedef Concat< language, typename RepeatNTimes< language, repetitions - 1 >::type > type;
+};
+
+template < typename language > struct RepeatNTimes < language, 1 >
+{
+	typedef language type;
+};
+
+template < typename language > struct RepeatNTimes < language, 0 >
+{
+	typedef EmptyWordLanguage < typename language::alphabet > type;
+};
+
+/**
+	@brief Repeating something at least N times
+*/
+template < typename language, size_t minRepetitions > struct RepeatAtLeast
+{
+	typedef Concat< language, typename RepeatAtLeast< language, minRepetitions - 1 >::type > type;
+};
+
+template < typename language > struct RepeatAtLeast < language, 0 >
+{
+	typedef Repeat< language > type;
+};
+
+/**
+	@brief Repeating something N to M times
+*/
+template < typename language, size_t minRepetitions, size_t maxRepetitions > struct RepeatFromTo
+{
+	static_assert( minRepetitions < maxRepetitions, "Minimum comes first in RepeatFromTo!" );
+	typedef Concat < language, typename RepeatFromTo < language, minRepetitions - 1, maxRepetitions - 1 >::type > type;
+};
+
+template < typename language, size_t n > struct RepeatFromTo < language, n, n >
+{
+	typedef typename RepeatNTimes< language, n >::type type;
+};
+
+template < typename language, size_t n > struct RepeatFromTo < language, 0, n >
+{
+	typedef Concat < typename Optional< language >::type, typename RepeatFromTo < language, 0, n - 1 >::type > type;
+};
+
+// since both of the above would have to deduce 1 parameter for RepeatFromTo<X, 0, 0>, they're ambiguous. Hence this specialization:
+template < typename language > struct RepeatFromTo < language, 0, 0 >
+{
+	typedef typename RepeatNTimes< language, 0 >::type type;
+};
+
+/**
+	@brief Shorthand for once or more, in case you dislike repeating yourself
+
+	You could just write a|a*
+*/
+
 //			Functions
 
 /**

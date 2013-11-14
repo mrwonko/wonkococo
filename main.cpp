@@ -14,11 +14,20 @@ int main(int argc, char** argv)
 			Regex::Concat <
 				Regex::Letter < char, 'W' >,
 				Regex::Repeat <
-					Regex::Letter < char, '!' >
+					Regex::Range< char, 'a', 'z' >::type
 				>
 			>
 		>
 	> myRegularLanguage;
 	std::cout << Regex::ToString< myRegularLanguage >::run() << std::endl;
+	std::cout << "3x X: " << Regex::ToString<
+		Regex::RepeatNTimes< Regex::Letter< char, 'X' >, 3 >::type
+	>::run() << std::endl;
+	std::cout << "at least 2x y: " << Regex::ToString<
+		Regex::RepeatAtLeast< Regex::Letter< char, 'y' >, 2 >::type
+	>::run() << std::endl;
+	std::cout << "2-4x z: " << Regex::ToString<
+		Regex::RepeatFromTo< Regex::Letter< char, 'z' >, 2, 4 >::type
+	>::run() << std::endl;
 	return EXIT_SUCCESS;
 }
