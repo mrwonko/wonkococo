@@ -41,9 +41,9 @@ int main(int argc, char** argv)
 	std::cout << Helper::ContainsType<int, char, double, int*>::value << std::endl;
 	std::cout << Helper::ContainsType<int, char, double, int, bool>::value << std::endl;
 	std::cout << Helper::ContainsType<int>::value << std::endl;
-	std::cout << "Testing Helper::ContainsNumber" << std::endl;
-	std::cout << Helper::ContainsNumber<13, 4, 8>::value << std::endl;
-	std::cout << Helper::ContainsNumber<13, 4, 9, 2, 13, 5, 8>::value << std::endl;
-	std::cout << Helper::ContainsNumber<42>::value << std::endl;
+	std::cout << "Testing Helper::ContainsValue" << std::endl;
+	std::cout << Helper::ContainsValue<size_t, 13, 4, 8>::value << std::endl;
+	std::cout << Helper::ContainsValue<size_t, 13, 4, 9, 2, 13, 5, 8>::value << std::endl;
+	std::cout << Helper::ContainsValue<size_t, 42>::value << std::endl;
 	return EXIT_SUCCESS;
 }

@@ -31,17 +31,17 @@ template < typename Needle, typename head, typename... tail > struct ContainsTyp
 
 	Usage:
 	@code{.cpp}
-		Helper::ContainsNumber<42, 2, 3, 4>::value
+		Helper::ContainsValue<42, 2, 3, 4>::value
 	@endcode
 */
 // default: false
-template < size_t Needle, size_t... haystack > struct ContainsNumber : std::false_type{};
+template < typename T, T Needle, T... haystack > struct ContainsValue : std::false_type{};
 
 // specialization: head of list is Needle
-template < size_t Needle, size_t... tail > struct ContainsNumber < Needle, Needle, tail... > : std::true_type {};
+template < typename T, T Needle, T... tail > struct ContainsValue < T, Needle, Needle, tail... > : std::true_type {};
 
 // Recursion: If head of list is not Needle, ignore it.
-template < size_t Needle, size_t head, size_t... tail > struct ContainsNumber < Needle, head, tail... > : ContainsNumber < Needle, tail... > {};
+template < typename T, T Needle, T head, T... tail > struct ContainsValue < T, Needle, head, tail... > : ContainsValue < T, Needle, tail... > {};
 
 }
 
