@@ -1,11 +1,11 @@
 module Regex
     --    constructing Regular Expressions    --
-    ( Regex (EmptyWord, Symbol, AnySymbol)
+    ( Regex (NullSet, EmptyWord, Symbol, AnySymbol)
     , Regex.concat
     , repeat
     , union
     , intersection
-    , difference
+    --, difference -- TODO: export again once it's no longer broken wrt NullSet/l==r
     , range
     
     , repeatExactly
@@ -17,6 +17,9 @@ module Regex
     , anyBut
     
     --    Working with regular expressions    --
+    -- Does a regular expression match no words at all? O(n), actually checks!
+    -- Caution: False negatives possible if difference is used! (TODO: fix that)
+    , null
     -- Does a regular expression match the empty word?
     , matchesEmptyWord
     {- Returns the regular expression that matches all the words matched by the given
@@ -33,7 +36,7 @@ module Regex
     
     ) where
 
-import Prelude hiding (concat, repeat)
+import Prelude hiding (concat, repeat, null)
 
 
 --    regex type    --
@@ -107,6 +110,11 @@ NullSet `intersection` _ = NullSet
 _ `intersection` NullSet = NullSet
 -- Intersection with yourself changes nothing 
 l `intersection` r
+    {- CAUTION! This is no proper check for equivalence!
+       Probably no big problem though? Just makes expressions more complex,
+       but the cost of that is probably smaller than that of checking for
+       actual equivalence...
+    -} 
     | l == r    = l
     | otherwise = l `Intersection` r
 
@@ -117,7 +125,7 @@ NullSet `difference` _     = NullSet
 regex `difference` NullSet = regex
 -- Removing everything leaves nothing
 l `difference` r
-    | l == r    = NullSet
+    | l == r    = NullSet -- CAUTION! This is no proper check for equivalence! We'd have to compare minimal DFAs. TODO do that.
     | otherwise = l `Difference` r 
 
 
@@ -171,7 +179,7 @@ matchesEmptyWord (Repeat _) = True
 -- I could use a catch-all pattern for these, but I'd rather get errors when adding new patterns and not changing these
 matchesEmptyWord NullSet = False
 matchesEmptyWord (Symbol _) = False
-matchesEmptyWord (AnySymbol) = False
+matchesEmptyWord AnySymbol = False
 -- Concatenating two empty words yields the empty word
 matchesEmptyWord (l `Concat` r) = matchesEmptyWord l && matchesEmptyWord r
 matchesEmptyWord (l `Union` r) = matchesEmptyWord l || matchesEmptyWord r
@@ -201,3 +209,14 @@ deriveWord = foldl deriveCharacter
 
 matches :: Eq alphabet => Regex alphabet -> [alphabet] -> Bool
 matches regex word = matchesEmptyWord $ deriveWord regex word
+
+null :: Eq alphabet => Regex alphabet -> Bool
+null NullSet = True
+null EmptyWord = False
+null (Repeat _) = False
+null (Symbol _) = False
+null AnySymbol = False
+null (l `Concat` r) = null l || null r
+null (l `Union` r) = null l && null r
+null (l `Intersection` r) = null l || null r
+null (l `Difference` r) = null l || l == r -- CAUTION! This is no proper check for equivalence! We'd have to compare minimal DFAs.
