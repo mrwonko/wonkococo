@@ -1,4 +1,4 @@
 wonkococo
 =========
 
-A template-based compiler-compiler
+A compiler-compiler
