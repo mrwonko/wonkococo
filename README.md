@@ -1,4 +1,4 @@
 wonkococo
 =========
 
-A compiler-compiler
+Wonko's Compiler Compiler, or wcc for short.
