@@ -1,4 +1,5 @@
 module Regex
+    --    constructing Regular Expressions    --
     ( Regex (EmptyWord, Symbol, AnySymbol)
     , Regex.concat
     , repeat
@@ -6,10 +7,30 @@ module Regex
     , intersection
     , difference
     , range
+    
     , repeatExactly
     , repeatAtLeast
     , repeatAtMost
     , repeatBetween
+    , fromWord
+    , anyOf
+    , anyBut
+    
+    --    Working with regular expressions    --
+    -- Does a regular expression match the empty word?
+    , matchesEmptyWord
+    {- Returns the regular expression that matches all the words matched by the given
+       regular expression beginning with the given character without their first character
+       (the given one)
+       
+       Example:
+       (derive 'a' $ repeatBetween 2 5 $ Symbol 'a') == (repeatBetween 1 4 $ Symbol 'a') 
+    -} 
+    , deriveCharacter
+    -- Applying deriveCharacter for each character in a word
+    , deriveWord
+    -- Whether a regex matches a given word
+    
     ) where
 
 import Prelude hiding (concat, repeat)
@@ -18,15 +39,15 @@ import Prelude hiding (concat, repeat)
 --    regex type    --
 
 
-data Eq alphabet => Regex alphabet = NullSet        -- matches nothing
-    | EmptyWord                                     -- matches the empty string
-    | Symbol alphabet                               -- matches a single symbol
-    | AnySymbol                                     -- matches any symbol
-    | Concat (Regex alphabet) (Regex alphabet)      -- matches any concatenation of words where the first is from the first set and the second from the second
-    | Repeat (Regex alphabet)                       -- matches any number of repeated concatenations of words from the given set (even 0)
-    | Union (Regex alphabet) (Regex alphabet)       -- matches a word in either of the given sets
-    | Intersection (Regex alphabet) (Regex alphabet)-- matches any word that is in both the first set and the second one
-    | Difference (Regex alphabet) (Regex alphabet)  -- matches any word that is in the first set but not the second
+data Eq alphabet => Regex alphabet = NullSet            -- matches nothing
+    | EmptyWord                                         -- matches the empty string
+    | Symbol alphabet                                   -- matches a single symbol
+    | AnySymbol                                         -- matches any symbol
+    | (Regex alphabet) `Concat` (Regex alphabet)        -- matches any concatenation of words where the first is from the first set and the second from the second
+    | Repeat (Regex alphabet)                           -- matches any number of repeated concatenations of words from the given set (even 0)
+    | (Regex alphabet) `Union` (Regex alphabet)         -- matches a word in either of the given sets
+    | (Regex alphabet) `Intersection` (Regex alphabet)  -- matches any word that is in both the first set and the second one
+    | (Regex alphabet) `Difference` (Regex alphabet)    -- matches any word that is in the first set but not the second
     deriving Eq
 
 instance (Show alphabet, Eq alphabet) => Show (Regex alphabet) where
@@ -46,12 +67,12 @@ instance (Show alphabet, Eq alphabet) => Show (Regex alphabet) where
 
 concat :: Eq alphabet => Regex alphabet -> Regex alphabet -> Regex alphabet
 -- Pre-/suffixing the empty word changes nothing 
-concat EmptyWord regex = regex
-concat regex EmptyWord = regex
+EmptyWord `concat` regex = regex
+regex `concat` EmptyWord = regex
 -- Concatenation of NullSet yields nothing since there's nothing in NullSet
-concat NullSet _ = NullSet
-concat _ NullSet = NullSet
-concat l r = Concat l r 
+NullSet `concat` _ = NullSet
+_ `concat` NullSet = NullSet
+l `concat` r = Concat l r 
 
 repeat :: Eq alphabet => Regex alphabet -> Regex alphabet
 -- Repeating the empty word changes nothing
@@ -60,33 +81,44 @@ repeat EmptyWord = EmptyWord
 repeat NullSet = EmptyWord
 repeat regex = Repeat regex
 
+-- Checks whether the potential superset is a union of the subset and something else.
+-- Returns false negatives! But it does keep anyOf "baa" from returning (b|a|a) instead of (b|a)
+isDefinitelySubsetOf :: Eq alphabet => Regex alphabet -> Regex alphabet -> Bool
+subset `isDefinitelySubsetOf` superset
+    | subset == superset = True
+    | otherwise = case superset of 
+        (l `Union` r) -> subset `isDefinitelySubsetOf` l || subset `isDefinitelySubsetOf` r
+        otherwise   -> False 
+
 union :: Eq alphabet => Regex alphabet -> Regex alphabet -> Regex alphabet
 -- empty set is the neutral element of union
-union NullSet regex = regex
-union regex NullSet = regex
--- union with yourself changes nothing
-union l r
-    | l == r = l
-    | otherwise = Union l r
+NullSet `union` regex = regex
+regex `union` NullSet = regex
+l `union` r
+    -- if either is a subset of the other, only use the superset
+    | l `isDefinitelySubsetOf` r = r
+    | r `isDefinitelySubsetOf` l = l
+    -- if you can't be sure either's a subset (it may still be, just too hard to check), use union to be safe
+    | otherwise              = l `Union` r
 
 intersection :: Eq alphabet => Regex alphabet -> Regex alphabet -> Regex alphabet
 -- Intersection with an empty set yields an empty set
-intersection NullSet _ = NullSet
-intersection _ NullSet = NullSet
+NullSet `intersection` _ = NullSet
+_ `intersection` NullSet = NullSet
 -- Intersection with yourself changes nothing 
-intersection l r
+l `intersection` r
     | l == r    = l
-    | otherwise = Intersection l r
+    | otherwise = l `Intersection` r
 
 difference :: Eq alphabet => Regex alphabet -> Regex alphabet -> Regex alphabet
 -- You can't remove anything from an empty set
-difference NullSet _ = NullSet
+NullSet `difference` _     = NullSet
 -- Removing nothing from a set changes nothing
-difference regex NullSet = regex
+regex `difference` NullSet = regex
 -- Removing everything leaves nothing
-difference l r
+l `difference` r
     | l == r    = NullSet
-    | otherwise = Difference l r 
+    | otherwise = l `Difference` r 
 
 
 --    convenience constructors    --
@@ -95,23 +127,73 @@ difference l r
 range :: (Enum alphabet, Eq alphabet) => alphabet -> alphabet -> Regex alphabet
 range low high = foldl union NullSet $ map Symbol $ enumFromTo low high
 
-repeatExactly :: (Eq alphabet) => Int -> Regex alphabet -> Regex alphabet
+repeatExactly :: Eq alphabet => Int -> Regex alphabet -> Regex alphabet
 repeatExactly n regex
     | n < 0     = NullSet
     | n == 0    = EmptyWord
     | n == 1    = regex
-    | otherwise = concat regex $ repeatExactly (n-1) regex
+    | otherwise = regex `concat` repeatExactly (n-1) regex
 
-repeatAtLeast :: (Eq alphabet) => Int -> Regex alphabet -> Regex alphabet
+repeatAtLeast :: Eq alphabet => Int -> Regex alphabet -> Regex alphabet
 repeatAtLeast n regex = concat (repeatExactly n regex) (repeat regex) 
 
-repeatAtMost :: (Eq alphabet) => Int -> Regex alphabet -> Regex alphabet
+repeatAtMost :: Eq alphabet => Int -> Regex alphabet -> Regex alphabet
 repeatAtMost n regex
     | n < 0     = NullSet
     | n == 0    = EmptyWord
-    | otherwise = union (repeatExactly n regex) $ repeatAtMost (n-1) regex
+    | otherwise = repeatExactly n regex `union` repeatAtMost (n-1) regex
 
-repeatBetween :: (Eq alphabet) => Int -> Int -> Regex alphabet -> Regex alphabet
+repeatBetween :: Eq alphabet => Int -> Int -> Regex alphabet -> Regex alphabet
 repeatBetween low high regex
     | low > high = NullSet
-    | otherwise  = concat (repeatExactly low regex) $ repeatAtMost (high - low) regex 
+    | otherwise  = concat (repeatExactly low regex) $ repeatAtMost (high - low) regex
+
+fromWord :: Eq alphabet => [alphabet] -> Regex alphabet
+fromWord word = foldl concat EmptyWord $ map Symbol word
+
+anyOf :: Eq alphabet => [alphabet] -> Regex alphabet
+anyOf chars = foldl union NullSet $ map Symbol chars
+
+anyBut :: Eq alphabet => [alphabet] -> Regex alphabet
+anyBut chars = AnySymbol `difference` anyOf chars
+
+
+--    Regex matching    --
+
+matchesEmptyWord :: Eq alphabet => Regex alphabet -> Bool
+matchesEmptyWord EmptyWord = True
+-- Repeating 0 times yields the empty word
+matchesEmptyWord (Repeat _) = True
+-- I could use a catch-all pattern for these, but I'd rather get errors when adding new patterns and not changing these
+matchesEmptyWord NullSet = False
+matchesEmptyWord (Symbol _) = False
+matchesEmptyWord (AnySymbol) = False
+-- Concatenating two empty words yields the empty word
+matchesEmptyWord (l `Concat` r) = matchesEmptyWord l && matchesEmptyWord r
+matchesEmptyWord (l `Union` r) = matchesEmptyWord l || matchesEmptyWord r
+matchesEmptyWord (l `Intersection` r) = matchesEmptyWord l && matchesEmptyWord r
+matchesEmptyWord (l `Difference` r) = matchesEmptyWord l && not (matchesEmptyWord r)
+
+-- Like matchesEmptyWord, but either returns an empty set (no match) or the set with the empty word (match)
+matchesEmptyWord1 :: Eq alphabet => Regex alphabet -> Regex alphabet
+matchesEmptyWord1 regex = if matchesEmptyWord regex then EmptyWord else NullSet
+
+deriveCharacter :: Eq alphabet => Regex alphabet -> alphabet -> Regex alphabet
+deriveCharacter NullSet              _ = NullSet
+deriveCharacter EmptyWord            _ = NullSet
+deriveCharacter (Symbol s)           c
+    | c == s                           = EmptyWord
+    | otherwise                        = NullSet
+deriveCharacter AnySymbol            _ = EmptyWord
+deriveCharacter (Repeat r)           c = deriveCharacter r c `concat` Repeat r
+-- either remove c from the left side, or use the empty word left and remove c from the right side
+deriveCharacter (l `Concat` r)       c = (deriveCharacter l c `concat` r) `union` (matchesEmptyWord1 l `concat` deriveCharacter r c)
+deriveCharacter (l `Union` r)        c = deriveCharacter l c `union`        deriveCharacter r c
+deriveCharacter (l `Intersection` r) c = deriveCharacter l c `intersection` deriveCharacter r c
+deriveCharacter (l `Difference` r)   c = deriveCharacter l c `difference`   deriveCharacter r c
+
+deriveWord :: Eq alphabet => Regex alphabet -> [alphabet] -> Regex alphabet
+deriveWord = foldl deriveCharacter
+
+matches :: Eq alphabet => Regex alphabet -> [alphabet] -> Bool
+matches regex word = matchesEmptyWord $ deriveWord regex word
