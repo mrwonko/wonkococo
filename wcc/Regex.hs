@@ -135,18 +135,22 @@ repeatExactly n regex
     | otherwise = regex `concat` repeatExactly (n-1) regex
 
 repeatAtLeast :: Eq alphabet => Int -> Regex alphabet -> Regex alphabet
-repeatAtLeast n regex = concat (repeatExactly n regex) (repeat regex) 
+repeatAtLeast n regex = repeatExactly n regex `concat` repeat regex 
 
 repeatAtMost :: Eq alphabet => Int -> Regex alphabet -> Regex alphabet
 repeatAtMost n regex
     | n < 0     = NullSet
     | n == 0    = EmptyWord
+    -- TODO: Consider using (r|)(r|)(r|) instead of (rrr|rr|r|)
+    -- (which one is faster?)
     | otherwise = repeatExactly n regex `union` repeatAtMost (n-1) regex
 
 repeatBetween :: Eq alphabet => Int -> Int -> Regex alphabet -> Regex alphabet
 repeatBetween low high regex
     | low > high = NullSet
-    | otherwise  = concat (repeatExactly low regex) $ repeatAtMost (high - low) regex
+    -- TODO: Consider using (r|)(r|)r instead of (rrr|rr|r)
+    -- (which one is faster?)
+    | otherwise  = repeatExactly low regex `concat` repeatAtMost (high - low) regex
 
 fromWord :: Eq alphabet => [alphabet] -> Regex alphabet
 fromWord word = foldl concat EmptyWord $ map Symbol word

@@ -53,8 +53,12 @@ library
   -- other-modules:       
   
   -- Other library packages from which modules are imported.
-  build-depends:       base ==4.6.*
-  
-  -- Directories containing source files.
+  build-depends:       
+                       base ==4.6.*,
+                       containers ==0.5.*
   hs-source-dirs:      wcc
+  exposed-modules:     
+                       Regex,
+                       Scanner,
+                       CommonTypes
   
