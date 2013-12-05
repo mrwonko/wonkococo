@@ -96,8 +96,6 @@ range :: (Enum alphabet, Eq alphabet) => alphabet -> alphabet -> Regex alphabet
 range low high = foldl union NullSet $ map Symbol $ enumFromTo low high
 
 repeatExactly :: (Eq alphabet) => Int -> Regex alphabet -> Regex alphabet
-repeatExactly 0 _ = EmptyWord
-repeatExactly 1 regex = regex
 repeatExactly n regex
     | n < 0     = NullSet
     | n == 0    = EmptyWord
