@@ -1,6 +1,7 @@
 module Scanner
     ( Error
-    , Match
+    , errorToString
+    , Match( Match )
     , scan
     ) where
 
@@ -22,11 +23,22 @@ data Mark alphabet tokenNames
         -- remaining word
         [alphabet]
 
-data Error alphabet tokenNames
-    = NotYetImplementedError
-    | IllegalCharacterError (PositionInformation [alphabet])
-    | UnexpectedEndOfFile (PositionInformation [alphabet])
+data Error alphabet
+    = IllegalCharacter (PositionInformation [alphabet])
+    | UnexpectedEndOfFile [alphabet]
     deriving (Show)
+
+errorToString :: Maybe ([alphabet] -> String) -> Error alphabet -> String
+errorToString maybeWordConverter error = case error of
+    IllegalCharacter (PositionInformation position word) -> "Illegal character at " ++ positionToString position ++
+        case maybeWordConverter of
+            Nothing            -> []
+            Just wordConverter -> " in " ++ wordConverter word
+    UnexpectedEndOfFile word -> "Unexpected end of file" ++
+        case maybeWordConverter of
+            Nothing            -> []
+            Just wordConverter -> " while reading " ++ wordConverter word
+    
 
 deriveCharacterNotNull :: Eq alphabet => alphabet -> RE.Regex alphabet -> Maybe (RE.Regex alphabet)
 deriveCharacterNotNull char regex = case RE.deriveCharacter regex char of
@@ -47,30 +59,11 @@ scan ::
     -- word to tokenize
     -> [alphabet]
     -- Result: Error or list of tokens with line/char info
-    -> Either (Error alphabet tokenNames) [PositionInformation token]
+    -> Either (Error alphabet) [PositionInformation token]
 scan tokenDefinitions tokenConstructor isNewLine
     = fmap reverse . scan' NoMark beginning tokenDefinitions (PositionInformation beginning []) []
     where
         beginning = Position 1 1
-        {-
-        -- This would require ScopedTypeVariables, which is a ghc-specific extension so I'm reluctant to use it.
-        -- I'll just let the compiler do the signature deduction.
-        scan'
-            -- last token match (or NoMark)
-            :: Mark alphabet tokenNames
-            -- current position in word
-            -> Position
-            -- current token definitions (derived)
-            -> Map.Map tokenNames (RE.Regex alphabet)
-            -- current prefix
-            -> PositionInformation [alphabet]
-            -- result accumulator in reverse order (because that's faster)
-            -> [PositionInformation token]
-            -- remaining word
-            -> [alphabet]
-            -- Result: Error or list of tokens with line/char info
-            -> Either (Error alphabet tokenNames) [PositionInformation token]
-        -}
         scan'
             -- Last valid match, if any
             mark
@@ -89,7 +82,7 @@ scan tokenDefinitions tokenConstructor isNewLine
             | Map.null currentTokenDefinitions = case mark of
                 -- No match yet -> illegal input
                 NoMark
-                    -> Left $ IllegalCharacterError currentPrefixInfo
+                    -> Left $ IllegalCharacter $ PositionInformation position currentPrefix
                 -- Had a match -> go back there and add it to result (backtracking! This is why this is not O(n).)
                 Mark markedMatch markedPosition markedRemainingWord
                     -> backtrack
@@ -102,7 +95,7 @@ scan tokenDefinitions tokenConstructor isNewLine
                         -- No new input, so no need to generate any more
                         []        -> Right reverseMatchAccum
                         -- Had new input which didn't match anything so far, throw an error.
-                        otherwise -> Left $ UnexpectedEndOfFile currentPrefixInfo
+                        otherwise -> Left $ UnexpectedEndOfFile currentPrefix
                     -- We're in a valid match, backtrack.
                     Mark {} -> backtrack
                 -- there is input to eat
@@ -125,7 +118,7 @@ scan tokenDefinitions tokenConstructor isNewLine
                                 newRemainingWord
                     in scan' newMark newPosition newTokenDefinitions newPrefixInfo reverseMatchAccum newRemainingWord 
             where
-                currentPrefixInfo = PositionInformation currentPrefixPosition $ reverse currentReversePrefix
+                currentPrefix = reverse currentReversePrefix
                 -- only call if mark is a Mark
                 backtrack = let
                     (Mark markedMatch markedPosition markedRemainingWord) = mark

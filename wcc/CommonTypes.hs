@@ -2,6 +2,7 @@ module CommonTypes
     ( Position( Position )
     , incChar
     , incLine
+    , positionToString
     , PositionInformation( PositionInformation )
     ) where
 
@@ -19,6 +20,9 @@ incChar (Position line char) = Position line (char + 1)
 
 incLine :: Position -> Position
 incLine (Position line char) = Position (line + 1) 1
+
+positionToString :: Position -> String
+positionToString (Position line char) = show line ++ ":" ++ show char
 
 data PositionInformation x = PositionInformation Position x
     deriving (Eq, Show)    

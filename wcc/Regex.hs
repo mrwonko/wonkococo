@@ -42,7 +42,7 @@ import Prelude hiding (concat, repeat, null)
 --    regex type    --
 
 
-data Eq alphabet => Regex alphabet = NullSet            -- matches nothing
+data Regex alphabet = NullSet            -- matches nothing
     | EmptyWord                                         -- matches the empty string
     | Symbol alphabet                                   -- matches a single symbol
     | AnySymbol                                         -- matches any symbol
