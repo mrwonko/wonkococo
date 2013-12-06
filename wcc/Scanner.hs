@@ -84,7 +84,7 @@ scan tokenDefinitions tokenConstructor isNewLine
                 NoMark
                     -> Left $ IllegalCharacter $ PositionInformation position currentPrefix
                 -- Had a match -> go back there and add it to result (backtracking! This is why this is not O(n).)
-                Mark markedMatch markedPosition markedRemainingWord
+                Mark {}
                     -> backtrack
             -- Regexes may find a result yet, be greedy and read further
             | otherwise  = case remainingWord of
