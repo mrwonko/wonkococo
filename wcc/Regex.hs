@@ -5,7 +5,7 @@ module Regex
     , repeat
     , union
     , intersection
-    --, difference -- TODO: export again once it's no longer broken wrt NullSet/l==r
+    --, difference -- TODO: export again once it's no longer broken wrt NullSet/l==r; For hints on how to, see http://hackage.haskell.org/package/hxt-regex-xmlschema
     , range
     
     , repeatExactly

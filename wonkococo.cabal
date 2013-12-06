@@ -61,4 +61,5 @@ library
                        Regex,
                        Scanner,
                        CommonTypes
+  other-modules:       ManualTests
   

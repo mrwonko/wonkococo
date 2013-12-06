@@ -1,6 +1,8 @@
 module CommonTypes
     ( Position( Position )
-    , LocationInformation( LocationInformation )
+    , incChar
+    , incLine
+    , PositionInformation( PositionInformation )
     ) where
 
 data Position = Position
@@ -12,5 +14,11 @@ data Position = Position
 instance Show Position where
     show (Position line character) = "line " ++ show line ++ " character " ++ show character
 
-data LocationInformation x = LocationInformation Position x
+incChar :: Position -> Position
+incChar (Position line char) = Position line (char + 1)
+
+incLine :: Position -> Position
+incLine (Position line char) = Position (line + 1) 1
+
+data PositionInformation x = PositionInformation Position x
     deriving (Eq, Show)    
