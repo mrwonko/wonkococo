@@ -4,6 +4,9 @@ import CommonTypes
 import qualified Scanner
 import qualified Regex as RE
 import qualified Data.Map as Map
+import Data.Char (isAscii, isPrint, ord, chr)
+
+--    Scanner Tests    --
 
 matchResultToString :: Either (Scanner.Error Char) [PositionInformation (Scanner.Match Char String)] -> String
 matchResultToString (Left error) = Scanner.errorToString (Just show) error ++ "\n"
@@ -63,3 +66,81 @@ printTestResults scanner =
         printResult scanner x;
         putStr "\n\n\n"
     )
+
+
+--    Parser Test    --
+
+--  Simple Grammar for sequential prints  --
+
+data SequentialPrintTokenName
+    = SPTNPrint
+    | SPTNOpenParen
+    | SPTNCloseParen
+    | SPTNStringLiteral
+    | SPTNWhitespace
+    | SPTNComment
+    deriving (Eq, Ord)
+
+data SequentialPrintToken
+    = SPPrint
+    | SPOpenParen
+    | SPCloseParen
+    | SPStringLiteral String
+    deriving (Show)
+
+sequentialPrintUnescape :: String -> String
+sequentialPrintUnescape [] = []
+sequentialPrintUnescape ('\\':x:xs) = x:sequentialPrintUnescape xs
+sequentialPrintUnescape (x:xs) = x:sequentialPrintUnescape xs
+
+sequentialPrintScan :: String -> Either (Scanner.Error Char) [PositionInformation SequentialPrintToken]
+sequentialPrintScan = Scanner.scan (Map.fromList tokenDefs) postProcess (=='\n')
+    where
+        postProcess (Scanner.Match _ SPTNPrint) = Just SPPrint
+        postProcess (Scanner.Match _ SPTNOpenParen) = Just SPOpenParen
+        postProcess (Scanner.Match _ SPTNCloseParen) = Just SPCloseParen
+        postProcess (Scanner.Match match SPTNStringLiteral) = Just $ SPStringLiteral $ sequentialPrintUnescape $ init $ tail match
+        postProcess (Scanner.Match _ _) = Nothing -- Throw away Whitespace and Comment
+        
+        allChars = filter isPrint $ map chr [0..127]
+        re_allChars = RE.anyOf allChars
+        re_allCharsExcept x = RE.anyOf $ filter (not . (`elem` x)) allChars
+        
+        tokenDefs =
+            [ (SPTNPrint, RE.fromWord "print")
+            , (SPTNOpenParen, RE.Symbol '(')
+            , (SPTNCloseParen, RE.Symbol ')')
+            -- "([^\\"]|\\.)*"    (where . is a printable character)
+            , (SPTNStringLiteral, RE.Symbol '"' `RE.concat`
+                RE.repeat (re_allCharsExcept "\\\"" `RE.union` (RE.Symbol '\\' `RE.concat` re_allChars))
+                `RE.concat` RE.Symbol '"')
+            , (SPTNWhitespace, RE.repeatAtLeast 1 $ RE.anyOf " \n\t")
+            -- //[^\n]*\n?
+            , (SPTNComment, RE.fromWord "//" `RE.concat` RE.repeat (re_allCharsExcept "\n") `RE.concat` RE.repeatAtMost 1 (RE.Symbol '\n'))
+            ]
+
+{-
+    (Throw whitespace away during scanning)
+    Block := Statement | Statement Block
+    Statement := PrintKeyword OpenParen StringLiteral CloseParen
+-}
+
+data SequentialPrintBlock
+    -- stmt
+    = SPBStatement SequentialPrintStatement
+    -- stmt block
+    | SPBBlock SequentialPrintStatement SequentialPrintBlock
+
+data SequentialPrintStatement
+    -- print("...")
+    = SPSPrint String
+
+data T1 a = T1
+
+test :: T1 (T1 (T1 ()))
+test = T1
+
+{-
+sequentialPrintGrammar :: Grammar.Grammar 
+sequentialPrintGrammar = Grammar.Grammar
+-}

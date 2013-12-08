@@ -14,7 +14,7 @@ module Regex
     , repeatBetween
     , fromWord
     , anyOf
-    , anyBut
+    -- , anyBut -- TODO: export against once difference works
     
     --    Working with regular expressions    --
     -- Does a regular expression match no words at all? O(n), actually checks!

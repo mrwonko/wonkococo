@@ -25,4 +25,4 @@ positionToString :: Position -> String
 positionToString (Position line char) = show line ++ ":" ++ show char
 
 data PositionInformation x = PositionInformation Position x
-    deriving (Eq, Show)    
+    deriving (Eq, Show)
