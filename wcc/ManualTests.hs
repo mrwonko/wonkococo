@@ -51,15 +51,15 @@ testPrograms =
     ]
 
 lectureExamplePrograms =
-    [ "if8 if 1 .1 1.1"
+    [ "if8\nif\n1\n.1 1.1"
     , "127.0.0.1"
     , "hello --world\n"
     , "--hello world\n"
     ]
 
-printTestResults scanner programs = 
+printTestResults scanner = 
     mapM_ (\x -> do
         putStr $ "===     Program     ===\n" ++ x ++ "\n\n=== Scanner results ===\n";
         printResult scanner x;
         putStr "\n\n\n"
-    ) programs
+    )
