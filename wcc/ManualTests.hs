@@ -1,6 +1,7 @@
 module ManualTests where
 
 import CommonTypes
+import qualified Grammar
 import qualified Scanner
 import qualified Regex as RE
 import qualified Data.Map as Map
@@ -67,6 +68,19 @@ printTestResults scanner =
         putStr "\n\n\n"
     )
 
+
+--    Grammar Test    --
+
+-- Just a simple grammar to test show
+
+data ShowMeGrammarTerminals = SMGTNumber | SMGTPlus deriving (Enum, Show)
+data ShowMeGrammarSymbols = SMGSSum | SMGSTerm deriving (Eq, Show)
+data ShowMeGrammarProductions = SMGPSingleSum | SMGPMultiSum | SMGPNumber deriving (Ord, Eq, Enum, Show)
+showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
+    [ (SMGPSingleSum, (SMGSSum, [Grammar.Symbol SMGSTerm]))
+    , (SMGPMultiSum, (SMGSSum, [Grammar.Symbol SMGSTerm, Grammar.Terminal SMGTPlus, Grammar.Symbol SMGSSum]))
+    , (SMGPNumber, (SMGSTerm, [Grammar.Terminal SMGTNumber]))
+    ]
 
 --    Parser Test    --
 

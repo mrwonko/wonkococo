@@ -61,5 +61,7 @@ library
                        Regex,
                        Scanner,
                        CommonTypes,
-                       SimpleGrammar
+                       SimpleGrammar,
+                       Grammar
+  other-modules:       GrammarDetails
   
