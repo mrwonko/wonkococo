@@ -3,9 +3,11 @@ module ManualTests where
 import CommonTypes
 import qualified Grammar
 import qualified Scanner
+import qualified SyntaxTree as ST
 import qualified Regex as RE
 import qualified Data.Map as Map
 import Data.Char (isAscii, isPrint, ord, chr)
+import qualified Data.Foldable as F
 
 --    Scanner Tests    --
 
@@ -78,6 +80,7 @@ data ShowMeGrammarSymbols = SMGSSum | SMGSTerm deriving (Eq, Show)
 data ShowMeGrammarProductions = SMGPSingleSum | SMGPMultiSum | SMGPNumber deriving (Ord, Eq, Enum, Show)
 showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
     [ (SMGPSingleSum, (SMGSSum, [Grammar.Symbol SMGSTerm]))
+    -- careful: no left recursion, thus SMGSSum may not come first
     , (SMGPMultiSum, (SMGSSum, [Grammar.Symbol SMGSTerm, Grammar.Terminal SMGTPlus, Grammar.Symbol SMGSSum]))
     , (SMGPNumber, (SMGSTerm, [Grammar.Terminal SMGTNumber]))
     ]
@@ -158,3 +161,12 @@ test = T1
 sequentialPrintGrammar :: Grammar.Grammar 
 sequentialPrintGrammar = Grammar.Grammar
 -}
+
+--    Syntax Tree Tests    --
+
+tree1 = ST.Node 1 [ST.Leaf 'A', ST.Leaf 'B', ST.Node 2 [], ST.Node 3 [ST.Leaf 'C']]
+tree1leaves = F.foldr (:) [] tree1
+nodeTree1 = ST.NodeSyntaxTree tree1
+tree1nodes = F.foldr (:) [] nodeTree1
+tree2 = fmap (:"-Leaf") tree1
+nodeTree2 = fmap (*2) nodeTree1

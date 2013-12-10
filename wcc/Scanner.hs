@@ -32,11 +32,11 @@ errorToString :: Maybe ([alphabet] -> String) -> Error alphabet -> String
 errorToString maybeWordConverter error = case error of
     IllegalCharacter (PositionInformation position word) -> "Illegal character at " ++ positionToString position ++
         case maybeWordConverter of
-            Nothing            -> []
+            Nothing            -> ""
             Just wordConverter -> " in " ++ wordConverter word
     UnexpectedEndOfFile word -> "Unexpected end of file" ++
         case maybeWordConverter of
-            Nothing            -> []
+            Nothing            -> ""
             Just wordConverter -> " while reading " ++ wordConverter word
     
 

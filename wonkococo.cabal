@@ -62,6 +62,8 @@ library
                        Scanner,
                        CommonTypes,
                        SimpleGrammar,
-                       Grammar
+                       Grammar,
+                       SyntaxTree,
+                       Parser
   other-modules:       GrammarDetails
   
