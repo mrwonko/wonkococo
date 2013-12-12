@@ -64,6 +64,7 @@ library
                        SimpleGrammar,
                        Grammar,
                        SyntaxTree,
-                       Parser
+                       Parser,
+                       Token
   other-modules:       GrammarDetails
   
