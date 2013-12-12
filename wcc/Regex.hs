@@ -5,7 +5,7 @@ module Regex
     , repeat
     , union
     , intersection
-    --, difference -- TODO: export again once it's no longer broken wrt NullSet/l==r; For hints on how to, see http://hackage.haskell.org/package/hxt-regex-xmlschema
+    , difference
     , range
     
     , repeatExactly
@@ -14,12 +14,12 @@ module Regex
     , repeatBetween
     , fromWord
     , anyOf
-    -- , anyBut -- TODO: export against once difference works
+    , anyBut
     
     --    Working with regular expressions    --
-    -- Does a regular expression match no words at all? O(n), actually checks!
-    -- Caution: False negatives possible if difference is used! (TODO: fix that)
-    , null
+    -- Does a regular expression definitely match no words at all? O(n), actually checks!
+    -- Caution: False negatives possible if difference is used! No real way to prevent that.
+    , definitelyNull
     -- Does a regular expression match the empty word?
     , matchesEmptyWord
     {- Returns the regular expression that matches all the words matched by the given
@@ -33,7 +33,7 @@ module Regex
     -- Applying deriveCharacter for each character in a word
     , deriveWord
     -- Whether a regex matches a given word
-    
+    , matches
     ) where
 
 import Prelude hiding (concat, repeat, null)
@@ -72,6 +72,9 @@ concat :: Eq alphabet => Regex alphabet -> Regex alphabet -> Regex alphabet
 -- Pre-/suffixing the empty word changes nothing 
 EmptyWord `concat` regex = regex
 regex `concat` EmptyWord = regex
+-- concatenation with something optional (empty word always comes left in union)
+l `concat` Union EmptyWord r = l `union` (l `concat` r)
+Union EmptyWord l `concat` r = r `union` (l `concat` r)
 -- Concatenation of NullSet yields nothing since there's nothing in NullSet
 NullSet `concat` _ = NullSet
 _ `concat` NullSet = NullSet
@@ -102,7 +105,13 @@ l `union` r
     | l `isDefinitelySubsetOf` r = r
     | r `isDefinitelySubsetOf` l = l
     -- if you can't be sure either's a subset (it may still be, just too hard to check), use union to be safe
-    | otherwise              = l `Union` r
+    | otherwise              = l `union'` r
+    where
+        -- keep empty word outmost and leftmost since patternmatching against it is useful for simplifications
+        l `union'` (EmptyWord `Union` r) = EmptyWord `Union` (l `union` r)
+        (EmptyWord `Union` l) `union'` r = EmptyWord `Union` (l `union` r)
+        l `union'` EmptyWord = EmptyWord `Union` l
+        l `union'` r = l `Union` r
 
 intersection :: Eq alphabet => Regex alphabet -> Regex alphabet -> Regex alphabet
 -- Intersection with an empty set yields an empty set
@@ -125,8 +134,8 @@ NullSet `difference` _     = NullSet
 regex `difference` NullSet = regex
 -- Removing everything leaves nothing
 l `difference` r
-    | l == r    = NullSet -- CAUTION! This is no proper check for equivalence! We'd have to compare minimal DFAs. TODO do that.
-    | otherwise = l `Difference` r 
+    | l `isDefinitelySubsetOf` r = NullSet -- Is not always sufficient, but catches some common cases.
+    | otherwise                  = l `Difference` r 
 
 
 --    convenience constructors    --
@@ -210,13 +219,13 @@ deriveWord = foldl deriveCharacter
 matches :: Eq alphabet => Regex alphabet -> [alphabet] -> Bool
 matches regex word = matchesEmptyWord $ deriveWord regex word
 
-null :: Eq alphabet => Regex alphabet -> Bool
-null NullSet = True
-null EmptyWord = False
-null (Repeat _) = False
-null (Symbol _) = False
-null AnySymbol = False
-null (l `Concat` r) = null l || null r
-null (l `Union` r) = null l && null r
-null (l `Intersection` r) = null l || null r
-null (l `Difference` r) = null l || l == r -- CAUTION! This is no proper check for equivalence! We'd have to compare minimal DFAs.
+definitelyNull :: Eq alphabet => Regex alphabet -> Bool
+definitelyNull NullSet = True
+definitelyNull EmptyWord = False
+definitelyNull (Repeat _) = False
+definitelyNull (Symbol _) = False
+definitelyNull AnySymbol = False
+definitelyNull (l `Concat` r) = definitelyNull l || definitelyNull r
+definitelyNull (l `Union` r) = definitelyNull l && definitelyNull r
+definitelyNull (l `Intersection` r) = definitelyNull l || definitelyNull r
+definitelyNull (l `Difference` r) = definitelyNull l || l `isDefinitelySubsetOf` r -- CAUTION! Does not catch all cases!
