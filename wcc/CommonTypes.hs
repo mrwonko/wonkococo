@@ -1,10 +1,13 @@
 module CommonTypes
-    ( Position( Position )
+    -- A position in a file (i.e. a long word containing linebreaks)
+    ( Position(..)
+    -- 
     , incChar
     , incLine
     , positionToString
-    , PositionInformation( PositionInformation )
     ) where
+
+import Control.Monad.State
 
 data Position = Position
     { line :: Int       -- We won't have billions of LOC in a single file. Or shouldn't.
@@ -24,5 +27,3 @@ incLine (Position line char) = Position (line + 1) 1
 positionToString :: Position -> String
 positionToString (Position line char) = show line ++ ":" ++ show char
 
-data PositionInformation x = PositionInformation Position x
-    deriving (Eq, Show)

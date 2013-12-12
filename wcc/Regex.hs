@@ -199,25 +199,25 @@ matchesEmptyWord (l `Difference` r) = matchesEmptyWord l && not (matchesEmptyWor
 matchesEmptyWord1 :: Eq alphabet => Regex alphabet -> Regex alphabet
 matchesEmptyWord1 regex = if matchesEmptyWord regex then EmptyWord else NullSet
 
-deriveCharacter :: Eq alphabet => Regex alphabet -> alphabet -> Regex alphabet
-deriveCharacter NullSet              _ = NullSet
-deriveCharacter EmptyWord            _ = NullSet
-deriveCharacter (Symbol s)           c
+deriveCharacter :: Eq alphabet => alphabet -> Regex alphabet -> Regex alphabet
+deriveCharacter _ NullSet              = NullSet
+deriveCharacter _ EmptyWord            = NullSet
+deriveCharacter c (Symbol s)
     | c == s                           = EmptyWord
     | otherwise                        = NullSet
-deriveCharacter AnySymbol            _ = EmptyWord
-deriveCharacter (Repeat r)           c = deriveCharacter r c `concat` Repeat r
+deriveCharacter _ AnySymbol            = EmptyWord
+deriveCharacter c (Repeat r)           = deriveCharacter c r `concat` Repeat r
 -- either remove c from the left side, or use the empty word left and remove c from the right side
-deriveCharacter (l `Concat` r)       c = (deriveCharacter l c `concat` r) `union` (matchesEmptyWord1 l `concat` deriveCharacter r c)
-deriveCharacter (l `Union` r)        c = deriveCharacter l c `union`        deriveCharacter r c
-deriveCharacter (l `Intersection` r) c = deriveCharacter l c `intersection` deriveCharacter r c
-deriveCharacter (l `Difference` r)   c = deriveCharacter l c `difference`   deriveCharacter r c
+deriveCharacter c (l `Concat` r)       = (deriveCharacter c l `concat` r) `union` (matchesEmptyWord1 l `concat` deriveCharacter c r)
+deriveCharacter c (l `Union` r)        = deriveCharacter c l `union`        deriveCharacter c r
+deriveCharacter c (l `Intersection` r) = deriveCharacter c l `intersection` deriveCharacter c r
+deriveCharacter c (l `Difference` r)   = deriveCharacter c l `difference`   deriveCharacter c r
 
-deriveWord :: Eq alphabet => Regex alphabet -> [alphabet] -> Regex alphabet
-deriveWord = foldl deriveCharacter
+deriveWord :: Eq alphabet => [alphabet] -> Regex alphabet -> Regex alphabet
+deriveWord = flip $ foldl (flip deriveCharacter)
 
 matches :: Eq alphabet => Regex alphabet -> [alphabet] -> Bool
-matches regex word = matchesEmptyWord $ deriveWord regex word
+matches regex word = matchesEmptyWord $ deriveWord word regex
 
 definitelyNull :: Eq alphabet => Regex alphabet -> Bool
 definitelyNull NullSet = True

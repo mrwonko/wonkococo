@@ -55,7 +55,7 @@ library
   -- Other library packages from which modules are imported.
   build-depends:       
                        base ==4.6.*,
-                       containers ==0.5.*
+                       containers ==0.5.*,
                        mtl ==2.1.*
   hs-source-dirs:      wcc
   exposed-modules:     
