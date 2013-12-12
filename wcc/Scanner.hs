@@ -45,7 +45,7 @@ deriveCharacterNotNull char regex = case RE.deriveCharacter regex char of
     -- Note: this assumes that the smart constructors take care of simplifying regexes down to NullSet where possible.
     -- Note: That could be fatal! It would potentially result in a complete scan of the remaining word after each derivation!
     RE.NullSet -> Nothing
-    r          -> assert (not $ RE.null r) $ Just r
+    r          -> assert (not $ RE.definitelyNull r) $ Just r
 
 scan ::
     -- Alphabet needs to be showable for errors (could supply a toString function as parameter if that's ever undesirable?)
