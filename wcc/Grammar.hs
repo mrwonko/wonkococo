@@ -24,7 +24,8 @@ instance (Show terminals, Show symbols) => Show (TerminalOrSymbol terminals symb
     show (IrrelevantTerminal t) = "(" ++ show t ++ ")"
     show (Symbol s)   = "<"  ++ show s ++ ">"
 
-instance (Show terminals, Show symbols, Eq symbols, Show productionNames) => Show (Grammar terminals symbols productionNames) where
+instance (Show terminals, Show symbols, Eq symbols, Show productionNames, Ord productionNames)
+    => Show (Grammar terminals symbols productionNames) where
     show (Grammar startSymbol productions)
         = Map.foldlWithKey concatProduction
         (   Map.foldlWithKey concatProduction "==  Grammar   ==\n= Start Symbol ="

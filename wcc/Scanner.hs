@@ -61,12 +61,12 @@ scan ::
     -- Result: Error or list of tokens with line/char info
     -> Either (Error alphabet) [PositionInformation token]
 scan tokenDefinitions tokenConstructor isNewLine
-    = fmap reverse . scan' NoMark beginning tokenDefinitions (PositionInformation beginning []) []
+    = scan' NoMark beginning tokenDefinitions (PositionInformation beginning []) []
     where
         beginning = Position 1 1
         scan'
             -- Last valid match, if any
-            mark
+            mark -- TODO: use State instead?
             -- current position in word
             position
             -- current derivations of the token definition regexes
@@ -93,7 +93,7 @@ scan tokenDefinitions tokenConstructor isNewLine
                     -- No valid match yet. Maybe there has been no new input since the last one?
                     NoMark -> case currentReversePrefix of
                         -- No new input, so no need to generate any more
-                        []        -> Right reverseMatchAccum
+                        []        -> Right $ reverse reverseMatchAccum
                         -- Had new input which didn't match anything so far, throw an error.
                         otherwise -> Left $ UnexpectedEndOfFile currentPrefix
                     -- We're in a valid match, backtrack.
