@@ -9,6 +9,9 @@ import qualified Regex as RE
 import CommonTypes
 import qualified Data.Map as Map
 import Control.Exception ( assert )
+import Token
+import Error
+import Control.Monad.State
 
 data Match alphabet tokenNames = Match [alphabet] tokenNames
     deriving (Eq, Show)
@@ -23,27 +26,45 @@ data Mark alphabet tokenNames
         -- remaining word
         [alphabet]
 
-data Error alphabet
-    = IllegalCharacter (PositionInformation [alphabet])
-    | UnexpectedEndOfFile [alphabet]
-    deriving (Show)
-
-errorToString :: Maybe ([alphabet] -> String) -> Error alphabet -> String
-errorToString maybeWordConverter error = case error of
-    IllegalCharacter (PositionInformation position word) -> "Illegal character at " ++ positionToString position ++
-        case maybeWordConverter of
-            Nothing            -> ""
-            Just wordConverter -> " in " ++ wordConverter word
-    UnexpectedEndOfFile word -> "Unexpected end of file" ++
-        case maybeWordConverter of
-            Nothing            -> ""
-            Just wordConverter -> " while reading " ++ wordConverter word
-    
-
 deriveCharacterNotNull :: Eq alphabet => alphabet -> RE.Regex alphabet -> Maybe (RE.Regex alphabet)
 deriveCharacterNotNull char regex = case RE.deriveCharacter regex char of
     RE.NullSet -> Nothing
     r          -> Just r
+
+data TokenDefinitions alphabet tokenNames = TokenDefinitions (Map.Map Int (TokenDefinition tokenNames alphabet))
+
+
+data ScannerState alphabet tokenNames
+    = ScannerState
+    { mark :: Mark
+    , position :: Position
+    , tokenDefinitions :: TokenDefinitions alphabet tokenNames
+    , prefixInformation :: PositionInformation [alphabet]
+    , reverseResults :: [PositionInformation token] -- do x <- fmap reverse reverseResults
+    , word :: [alphabet]
+    }
+
+setMark :: Match alphabet tokenNames -> Position -> [alphabet] -> ScannerState alphabet tokenNames -> ((), ScannerState alphabet tokenNames)
+setMark match position remainingWord (ScannerState _ curPos oldTD oldPI oldRR oldWord)
+    = ((), ScannerState (Mark match position remainingWord) oldPos oldTD oldPI oldRR oldWord)
+
+removeMark :: ScannerState alphabet tokenNames -> ((), ScannerState alphabet tokenNames)
+removeMark (ScannerState _ oldPos oldTD oldPI oldRR oldWord)
+    = ((), ScannerState NoMark oldPos oldTD oldPI oldRR oldWord)
+
+readCharacter :: (alphabet -> Bool) -> ScannerState alphabet tokenNames -> ((), ScannerState alphabet tokenNames)
+readCharacter isNewline (ScannerState oldMark oldPos oldTD oldPI oldRR)
+    = ((), ScannerState oldMark newPos newTD newPI oldRR)
+    where
+        newPos = if isNewLine nextChar then incLine oldPos else incChar oldPos
+        PositionInformation oldPrefixStart oldReversePrefix
+        newPI = PositionInformation oldPrefixStart $ 
+
+initialState :: TokenDefinitions alphabet tokenNames -> [alphabet] -> ScannerState alphabet tokenNames
+initialState initialTokenDefinitions word
+    = ScannerState NoMark start initialTokenDefinitions (PositionInformation start []) [] word
+    where
+        start = Position 1 1
 
 scan ::
     -- Alphabet needs to be showable for errors (could supply a toString function as parameter if that's ever undesirable?)
