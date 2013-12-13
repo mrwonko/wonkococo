@@ -9,8 +9,6 @@ import Error
 import Control.Monad
 import Control.Monad.State
 
-import Debug.Trace
-
 data Mark tokenNames alphabet
     = NoMark
     | Mark
@@ -90,18 +88,12 @@ readCharacter isNewline = do
                 return definition
             }
 
--- Backtracks, if possible
--- If there's no mark but we're at the EOF, it does nothing.
--- If there's no mark and there's still something to be read, it errors
+-- Backtracks, if possible, errors otherwise.
 backtrack :: TokenDefinitions tokenNames alphabet -> CompilerError alphabet -> ScannerState tokenNames alphabet
 backtrack initialTokenDefinitions onFailure = do
     m <- gets mark
     case m of
-        NoMark -> do
-            w <- gets word
-            case w of
-                [] -> return () -- FIXME: This presumably leads to an infinite loop!
-                otherwise -> putError onFailure
+        NoMark -> putError onFailure
         Mark maybeToken markedPosition markedWord -> do
             modify $ \ d -> d
                 { position = markedPosition
@@ -129,7 +121,7 @@ initialData initialTokenDefinitions word = ScannerData
     , word = word
     }
 
-scan :: (Eq alphabet, Show alphabet, Show tokenNames) -- TODO: Remove Show requirements
+scan :: (Eq alphabet)
     -- Newline check
     => (alphabet -> Bool)
     -- Token Definitions
@@ -146,7 +138,7 @@ scan isNewline initialTokenDefinitions initialWord =
         scanStep = do
             state <- get
             -- Are we at EOF?
-            if trace (show (word state, reverseMatch state, mark state)) $ null (word state)
+            if null (word state)
                 -- We're at EOF. If we're not in the middle of a match, that's okay and we're done.
                 -- But usually we'll have to try to backtrack and continue.
                 then unless (null $ reverseMatch state) $ do

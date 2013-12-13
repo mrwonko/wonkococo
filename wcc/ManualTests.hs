@@ -11,14 +11,20 @@ import qualified Data.Foldable as F
 import qualified Error
 import Token
 
-tmp = printResult testScan $ testPrograms !! 2
+runTests = foldl (>>) (return ()) tests
+
+tests =
+    [ putStrLn "** MY SMALL SCAN **\n\n" >> printTestResults testScan testPrograms
+    , putStrLn "** LECTURE EXAMPLE SCAN **\n\n" >> printTestResults lectureExampleScan lectureExamplePrograms
+    , putStrLn "** SEQUENTIAL PRINT SCAN **\n\n" >> print testSequentialPrint >> putStrLn "\n"
+    ]
 
 --    Scanner Tests    --
 
 type SimpleResult = Error.Result Char (Tokens String Char)
 
 matchResultToString :: SimpleResult -> String
-matchResultToString (Left error) = Error.toDetailedString error
+matchResultToString (Left error) = Error.toDetailedString error ++ "\n"
 matchResultToString (Right []) = ""
 matchResultToString (Right (token:tokens))
     = (++) (positionToString (tPosition token) ++ " " ++ tName token ++ matchIfAny ++ "\n") $ matchResultToString $ Right tokens
@@ -101,8 +107,6 @@ showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
 
 --  Simple Grammar for sequential prints  --
 
-{-
-
 data SequentialPrintTokenName
     = SPTNPrint
     | SPTNOpenParen
@@ -110,45 +114,58 @@ data SequentialPrintTokenName
     | SPTNStringLiteral
     | SPTNWhitespace
     | SPTNComment
-    deriving (Eq, Ord)
-
-data SequentialPrintToken
-    = SPPrint
-    | SPOpenParen
-    | SPCloseParen
-    | SPStringLiteral String
-    deriving (Show)
+    deriving (Eq, Show)
 
 sequentialPrintUnescape :: String -> String
 sequentialPrintUnescape [] = []
 sequentialPrintUnescape ('\\':x:xs) = x:sequentialPrintUnescape xs
 sequentialPrintUnescape (x:xs) = x:sequentialPrintUnescape xs
 
-sequentialPrintScan :: String -> Error.Result Char (Tokens SequentialPrintToken Char)
+type SequentialPrintToken = Token SequentialPrintTokenName Char
+type SequentialPrintScanResult = Error.Result Char [SequentialPrintToken]
+
+sequentialPrintScan :: String -> SequentialPrintScanResult
 sequentialPrintScan = Scanner.scan (=='\n') tokenDefs
     where
-        postProcess (Scanner.Match _ SPTNPrint) = Just SPPrint
-        postProcess (Scanner.Match _ SPTNOpenParen) = Just SPOpenParen
-        postProcess (Scanner.Match _ SPTNCloseParen) = Just SPCloseParen
-        postProcess (Scanner.Match match SPTNStringLiteral) = Just $ SPStringLiteral $ sequentialPrintUnescape $ init $ tail match
-        postProcess (Scanner.Match _ _) = Nothing -- Throw away Whitespace and Comment
-        
         allChars = filter isPrint $ map chr [0..127]
         re_allChars = RE.anyOf allChars
         re_allCharsExcept x = RE.anyOf $ filter (not . (`elem` x)) allChars
         
         tokenDefs =
-            [ (SPTNPrint, RE.fromWord "print")
-            , (SPTNOpenParen, RE.Symbol '(')
-            , (SPTNCloseParen, RE.Symbol ')')
+            [ TokenDefinition SPTNPrint (RE.fromWord "print") KeepToken
+            , TokenDefinition SPTNOpenParen (RE.Symbol '(') KeepToken
+            , TokenDefinition SPTNCloseParen (RE.Symbol ')') KeepToken
             -- "([^\\"]|\\.)*"    (where . is a printable character)
-            , (SPTNStringLiteral, RE.Symbol '"' `RE.concat`
+            , TokenDefinition SPTNStringLiteral (RE.Symbol '"' `RE.concat`
                 RE.repeat (re_allCharsExcept "\\\"" `RE.union` (RE.Symbol '\\' `RE.concat` re_allChars))
-                `RE.concat` RE.Symbol '"')
-            , (SPTNWhitespace, RE.repeatAtLeast 1 $ RE.anyOf " \n\t")
+                `RE.concat` RE.Symbol '"') KeepTokenAndMatch
+            , TokenDefinition SPTNWhitespace (RE.repeatAtLeast 1 $ RE.anyOf " \n\t") DiscardToken
             -- //[^\n]*\n?
-            , (SPTNComment, RE.fromWord "//" `RE.concat` RE.repeat (re_allCharsExcept "\n") `RE.concat` RE.repeatAtMost 1 (RE.Symbol '\n'))
+            , TokenDefinition SPTNComment (RE.fromWord "//" `RE.concat`
+                RE.repeat (re_allCharsExcept "\n") `RE.concat`
+                RE.repeatAtMost 1 (RE.Symbol '\n')) DiscardToken
             ]
+
+-- Removes "" around strings, unescapes them
+sequentialPrintPostprocessString :: String -> String
+sequentialPrintPostprocessString s
+    = init $ tail $ unescape s
+    where
+        unescape ('\\':x:xs) = x : unescape xs
+        unescape (x:xs) = x : unescape xs
+        unescape [] = []
+
+sequentialPrintPostprocessToken :: SequentialPrintToken -> SequentialPrintToken
+sequentialPrintPostprocessToken t @ (Token SPTNStringLiteral (Just match) _)
+    = t { tMatch = Just $ sequentialPrintPostprocessString match }
+sequentialPrintPostprocessToken t = t
+
+sequentialPrintPostScan :: SequentialPrintScanResult -> SequentialPrintScanResult
+sequentialPrintPostScan = fmap $ map sequentialPrintPostprocessToken
+
+testSequentialPrint = sequentialPrintPostScan
+    $ sequentialPrintScan
+    "print(\"Hello \\\"World\\\"\") // printing hello world\nprint(\"foo \\bar\")"
 
 {-
     (Throw whitespace away during scanning)
@@ -184,5 +201,3 @@ nodeTree1 = ST.NodeSyntaxTree tree1
 tree1nodes = F.foldr (:) [] nodeTree1
 tree2 = fmap (:"-Leaf") tree1
 nodeTree2 = fmap (*2) nodeTree1
-
--}
