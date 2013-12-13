@@ -1,31 +1,32 @@
 module Scanner
-    (-- scan
+    ( scan
     ) where
 
 import qualified Regex as RE
 import CommonTypes
-import qualified Data.Map as Map
-import Control.Exception ( assert )
 import Token
 import Error
 import Control.Monad
 import Control.Monad.State
 
-data Mark alphabet tokenNames
+import Debug.Trace
+
+data Mark tokenNames alphabet
     = NoMark
     | Mark
         -- match
-        (Token alphabet tokenNames)
+        (Maybe (Token tokenNames alphabet))
         -- Position after match
         Position
         -- remaining word
         [alphabet]
+    deriving (Show)
 
 
 -- Mutable Data for scanner
-data ScannerData alphabet tokenNames
+data ScannerData tokenNames alphabet
     = ScannerData
-    { mark :: Mark alphabet tokenNames
+    { mark :: Mark tokenNames alphabet
     , position :: Position
     , tokenDefinitions :: TokenDefinitions tokenNames alphabet
     , reverseMatch :: [alphabet]
@@ -34,37 +35,90 @@ data ScannerData alphabet tokenNames
     , word :: [alphabet]
     }
 
-type ScannerState alphabet tokenNames = StateT (ScannerData alphabet tokenNames) (Result alphabet) ()
+type ScannerState tokenNames alphabet = StateT (ScannerData tokenNames alphabet) (Result alphabet) ()
 
-putError :: CompilerError alphabet -> ScannerState alphabet tokenNames
+putError :: CompilerError alphabet -> ScannerState tokenNames alphabet
 putError error = StateT $ \ _ -> Left error
 
-setMark :: Token alphabet tokenNames -> Position -> [alphabet] -> ScannerState alphabet tokenNames
+setMark :: Maybe (Token tokenNames alphabet) -> Position -> [alphabet] -> ScannerState tokenNames alphabet
 setMark token position remainingWord = modify $ \ d -> d { mark = Mark token position remainingWord }
 
-removeMark :: ScannerState alphabet tokenNames
-removeMark =  modify $ \ d -> d { mark = NoMark }
+-- Places a mark, if possible.
+-- i.e. if any token matches the current prefix
+markIfPossible :: ScannerState tokenNames alphabet
+markIfPossible = do
+    state <- get
+    -- We're interested in the first token that matches the current prefix
+    let emptyWordMatches = filter (RE.matchesEmptyWord . tdRegex) $ tokenDefinitions state
+    unless (null emptyWordMatches) $ do
+        -- What's its name? Where is it? Are we supposed to keep it?
+        let
+            tokenDefinition = head emptyWordMatches
+            tokenName = tdName tokenDefinition
+            tokenPosition = matchPosition state
+            tokenMatch = Just $ reverse $ reverseMatch state
+            token = case tdType tokenDefinition of
+                DiscardToken -> Nothing
+                KeepToken -> Just $ Token tokenName Nothing tokenPosition
+                KeepTokenAndMatch -> Just $ Token tokenName tokenMatch tokenPosition 
+        setMark token (position state) (word state)
 
--- Reads a character, errors on EOF
-readCharacter :: Eq alphabet => (alphabet -> Bool) -> ScannerState alphabet tokenNames
+-- Reads a character.
+-- Precondition: There is a character to read. LogicError otherwise.
+readCharacter :: Eq alphabet => (alphabet -> Bool) -> ScannerState tokenNames alphabet
 readCharacter isNewline = do
     oldWord <- gets word
     case oldWord of
         -- End of Input?
-        [] -> do
-            err <- fmap (UnexpectedEndOfFile . reverse) (gets reverseMatch)
-            putError err
+        [] -> putError $ AssertionError "readCharacter called at EOF"
+        -- Modify state accordingly with new char
         (curChar:newWord) -> modify $ \ oldState -> oldState
-            { matchPosition = (if isNewline curChar then incLine else incChar) (position oldState)
+            -- Remember new position
+            { position = (if isNewline curChar then incLine else incChar) (position oldState)
+            -- Remember newly read character
             , reverseMatch = curChar : reverseMatch oldState
-            -- Token Definitions may be empty now.
+            -- Adjust remaining word
+            , word = newWord
+            -- derive the token definition regexes
+            -- >> This is the central idea behind the matching! Deriving Regular Expressions. <<
+            -- Token Definitions may be empty now, meaning we need not read further, there won't be more matches.
+            -- But that's not for us to check.
             , tokenDefinitions = do
-                    definition <- fmap (mapTokenDefinitionRegex (RE.deriveCharacter curChar)) (tokenDefinitions oldState)
-                    guard $ tdRegex definition /= RE.NullSet
-                    return definition
+                definition <- fmap (mapTokenDefinitionRegex (RE.deriveCharacter curChar)) (tokenDefinitions oldState)
+                -- XXX: How expensive is the definitelyNull check?
+                guard $ not $ RE.definitelyNull $ tdRegex definition
+                return definition
             }
 
-initialData :: TokenDefinitions tokenNames alphabet -> [alphabet] -> ScannerData alphabet tokenNames
+-- Backtracks, if possible
+-- If there's no mark but we're at the EOF, it does nothing.
+-- If there's no mark and there's still something to be read, it errors
+backtrack :: TokenDefinitions tokenNames alphabet -> CompilerError alphabet -> ScannerState tokenNames alphabet
+backtrack initialTokenDefinitions onFailure = do
+    m <- gets mark
+    case m of
+        NoMark -> do
+            w <- gets word
+            case w of
+                [] -> return () -- FIXME: This presumably leads to an infinite loop!
+                otherwise -> putError onFailure
+        Mark maybeToken markedPosition markedWord -> do
+            modify $ \ d -> d
+                { position = markedPosition
+                , word = markedWord
+                , reverseMatch = []
+                , matchPosition = markedPosition
+                , tokenDefinitions = initialTokenDefinitions
+                , mark = NoMark
+                }
+            case maybeToken of
+                Just token -> modify $ \ d -> d { reverseResults = token : reverseResults d }
+                otherwise -> return ()
+
+extractResults :: ScannerData tokenNames alphabet -> Tokens tokenNames alphabet
+extractResults = reverse . reverseResults
+
+initialData :: TokenDefinitions tokenNames alphabet -> [alphabet] -> ScannerData tokenNames alphabet
 initialData initialTokenDefinitions word = ScannerData
     { mark = NoMark
     , position = Position 1 1
@@ -75,101 +129,38 @@ initialData initialTokenDefinitions word = ScannerData
     , word = word
     }
 
-{-
-
-scan ::
-    -- Alphabet needs to be showable for errors (could supply a toString function as parameter if that's ever undesirable?)
-    (Eq alphabet, Show alphabet, Ord tokenNames)
-    -- Token names and their regular expressions (token order matters!)
-    => Map.Map tokenNames (RE.Regex alphabet)
-    -- Constructor for tokens, whatever that may be, from a name and the match
-    -> (Match alphabet tokenNames -> Maybe token)
-    -- Check for Line break (for position display)
-    -> (alphabet -> Bool)
-    -- word to tokenize
+scan :: (Eq alphabet, Show alphabet, Show tokenNames) -- TODO: Remove Show requirements
+    -- Newline check
+    => (alphabet -> Bool)
+    -- Token Definitions
+    -> TokenDefinitions tokenNames alphabet
+    -- Word to scan
     -> [alphabet]
-    -- Result: Error or list of tokens with line/char info
-    -> Either (Error alphabet) [PositionInformation token]
-scan tokenDefinitions tokenConstructor isNewLine
-    = scan' NoMark beginning tokenDefinitions (PositionInformation beginning []) []
+    -- Resulting Tokens
+    -> Result alphabet (Tokens tokenNames alphabet)
+scan isNewline initialTokenDefinitions initialWord =
+    fmap extractResults $ execStateT scanStep $ initialData initialTokenDefinitions initialWord
     where
-        beginning = Position 1 1
-        scan'
-            -- Last valid match, if any
-            mark -- TODO: use State instead?
-            -- current position in word
-            position
-            -- current derivations of the token definition regexes
-            currentTokenDefinitions
-            -- current prefix being checked (reverse for cons speed)
-            (PositionInformation currentPrefixPosition currentReversePrefix)
-            -- result accumulator (reverse for cons speed)
-            reverseMatchAccum
-            -- remaining unscanned word
-            remainingWord
-            
-            -- No regexes will match, no need to read any further, go back to last matching position, if any
-            | Map.null currentTokenDefinitions = case mark of
-                -- No match yet -> illegal input
-                NoMark
-                    -> Left $ IllegalCharacter $ PositionInformation position currentPrefix
-                -- Had a match -> go back there and add it to result (backtracking! This is why this is not O(n).)
-                Mark {}
-                    -> backtrack
-            -- Regexes may find a result yet, be greedy and read further
-            | otherwise  = case remainingWord of
-                -- end of input. Are we in a valid match?
-                [] -> case mark of
-                    -- No valid match yet. Maybe there has been no new input since the last one?
-                    NoMark -> case currentReversePrefix of
-                        -- No new input, so no need to generate any more
-                        []        -> Right $ reverse reverseMatchAccum
-                        -- Had new input which didn't match anything so far, throw an error.
-                        otherwise -> Left $ UnexpectedEndOfFile currentPrefix
-                    -- We're in a valid match, backtrack.
-                    Mark {} -> backtrack
-                -- there is input to eat
-                (nextChar:newRemainingWord) -> let
-                    -- derive all regexes, throw away those that won't ever match anything again
-                    newTokenDefinitions = Map.mapMaybe (deriveCharacterNotNull nextChar) currentTokenDefinitions
-                    newPosition = if isNewLine nextChar then incLine position else incChar position
-                    -- add new character to current prefix (to front for speed, reverse it when setting Mark)
-                    newReversePrefix = nextChar : currentReversePrefix
-                    newPrefixInfo = PositionInformation currentPrefixPosition newReversePrefix
-                    -- if this is a match, set a mark.
-                    newMark = let matchingTokenDefinitions = Map.filter RE.matchesEmptyWord newTokenDefinitions in
-                        if Map.null matchingTokenDefinitions
-                            -- no matches, keep old mark
-                            then mark
-                            -- matches! Create a mark with the first match.
-                            else Mark
-                                (Match (reverse newReversePrefix) $ fst $ head $ Map.toAscList matchingTokenDefinitions)
-                                newPosition
-                                newRemainingWord
-                    in scan' newMark newPosition newTokenDefinitions newPrefixInfo reverseMatchAccum newRemainingWord 
-            where
-                currentPrefix = reverse currentReversePrefix
-                -- only call if mark is a Mark
-                backtrack = let
-                    (Mark markedMatch markedPosition markedRemainingWord) = mark
-                    newReverseMatchAccum = case tokenConstructor markedMatch of
-                            -- token constructor decided to keep the token - add location information and save it.
-                            Just newToken -> PositionInformation currentPrefixPosition newToken:reverseMatchAccum
-                            -- token constructor decided to throw the token away. (Comment or whatever.)
-                            Nothing       -> reverseMatchAccum
-                    in scan'
-                        -- new scan has nothing found yet
-                        NoMark
-                        -- starts after the last match
-                        markedPosition
-                        -- uses the underived original token regexes
-                        tokenDefinitions
-                        -- new prefix starts after the last one, is empty so far
-                        (PositionInformation markedPosition [])
-                        -- result accumulator might have had a new token added to it
-                        newReverseMatchAccum
-                        -- parse the remaining word
-                        markedRemainingWord
-
--}
+        backtrack' = backtrack initialTokenDefinitions
+        readCharacter' = readCharacter isNewline
+        scanStep = do
+            state <- get
+            -- Are we at EOF?
+            if trace (show (word state, reverseMatch state, mark state)) $ null (word state)
+                -- We're at EOF. If we're not in the middle of a match, that's okay and we're done.
+                -- But usually we'll have to try to backtrack and continue.
+                then unless (null $ reverseMatch state) $ do
+                    backtrack' $ UnexpectedEndOfFile $ reverse $ reverseMatch state
+                    scanStep
+                -- Not at EOF. Do any token definitions remain?
+                else if null $ tokenDefinitions state
+                    -- No tokens match anymore. Try to backtrack and continue.
+                    then do
+                        backtrack' $ IllegalCharacter (position state) (reverse $ reverseMatch state)
+                        scanStep
+                    -- We might find more matches yet! Onward!
+                    else do
+                        readCharacter'
+                        markIfPossible
+                        scanStep
 

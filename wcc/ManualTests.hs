@@ -8,27 +8,37 @@ import qualified Regex as RE
 import qualified Data.Map as Map
 import Data.Char (isAscii, isPrint, ord, chr)
 import qualified Data.Foldable as F
+import qualified Error
+import Token
+
+tmp = printResult testScan $ testPrograms !! 2
 
 --    Scanner Tests    --
 
-matchResultToString :: Either (Scanner.Error Char) [PositionInformation (Scanner.Match Char String)] -> String
-matchResultToString (Left error) = Scanner.errorToString (Just show) error ++ "\n"
-matchResultToString (Right []) = ""
-matchResultToString (Right (PositionInformation position (Scanner.Match word tokenName):xs))
-    = (++) (positionToString position ++ " " ++ tokenName ++ " (" ++ show word ++ ")\n") $ matchResultToString $ Right xs
+type SimpleResult = Error.Result Char (Tokens String Char)
 
-testScan :: String -> Either (Scanner.Error Char) [PositionInformation (Scanner.Match Char String)]
-testScan = Scanner.scan (Map.fromList tokenDefs) Just (=='\n')
+matchResultToString :: SimpleResult -> String
+matchResultToString (Left error) = Error.toDetailedString error
+matchResultToString (Right []) = ""
+matchResultToString (Right (token:tokens))
+    = (++) (positionToString (tPosition token) ++ " " ++ tName token ++ matchIfAny ++ "\n") $ matchResultToString $ Right tokens
+    where
+        matchIfAny = case tMatch token of
+            Nothing -> ""
+            Just match -> " (" ++ show match ++ ")"
+
+testScan :: String -> SimpleResult
+testScan = Scanner.scan (=='\n') tokenDefs
     where
         tokenDefs =
-            [ ("1Numbers", RE.repeatAtLeast 1 $ RE.range '0' '9')
-            , ("2Strings", RE.repeatAtLeast 1 $ RE.range 'a' 'z' `RE.union` RE.range 'A' 'Z')
-            , ("3Whitespace", RE.repeatAtLeast 1 $ RE.anyOf " \t\r\n")
-            --, ("4Error", RE.AnySymbol)
+            [ TokenDefinition "Number" (RE.repeatAtLeast 1 $ RE.range '0' '9') KeepTokenAndMatch
+            , TokenDefinition "String" (RE.repeatAtLeast 1 $ RE.range 'a' 'z' `RE.union` RE.range 'A' 'Z') KeepTokenAndMatch
+            , TokenDefinition "Whitespace" (RE.repeatAtLeast 1 $ RE.anyOf " \t\r\n") DiscardToken
+            --, TokenDefinition "Error" RE.AnySymbol KeepTokenAndMatch
             ]
 
-lectureExampleScan :: String -> Either (Scanner.Error Char) [PositionInformation (Scanner.Match Char String)]
-lectureExampleScan = Scanner.scan (Map.fromList tokenDefs) Just (=='\n')
+lectureExampleScan :: String -> SimpleResult
+lectureExampleScan = Scanner.scan (=='\n') tokenDefs
     where
         re_az = RE.range 'a' 'z'
         re_az_star = RE.repeat re_az
@@ -36,22 +46,23 @@ lectureExampleScan = Scanner.scan (Map.fromList tokenDefs) Just (=='\n')
         re_09_plus = RE.repeatAtLeast 1 re_09
         re_09_star = RE.repeat re_09
         tokenDefs =
-            [ ("1 - IF", RE.fromWord "if")
-            , ("2 - ID", re_az `RE.concat` RE.repeat (re_az `RE.union` re_09))
-            , ("3 - NUM", re_09_plus)
-            , ("4 - REAL", (RE.repeatAtLeast 1 re_09 `RE.concat` RE.Symbol '.' `RE.concat` re_09_star)
+            [ TokenDefinition "IF" (RE.fromWord "if") KeepToken
+            , TokenDefinition "ID" (re_az `RE.concat` RE.repeat (re_az `RE.union` re_09)) KeepTokenAndMatch
+            , TokenDefinition "NUM" re_09_plus KeepTokenAndMatch
+            , TokenDefinition "REAL" ((RE.repeatAtLeast 1 re_09 `RE.concat` RE.Symbol '.' `RE.concat` re_09_star)
                 `RE.union`
-                (RE.Symbol '.' `RE.concat` re_09_plus))
-            , ("5 - WHITESPACE", RE.repeatAtLeast 1 (RE.anyOf " \n\t")
+                (RE.Symbol '.' `RE.concat` re_09_plus)) KeepTokenAndMatch
+            , TokenDefinition "WHITESPACE" (RE.repeatAtLeast 1 (RE.anyOf " \n\t")
                 `RE.union`
-                (RE.fromWord "--" `RE.concat` re_az_star `RE.concat` RE.Symbol '\n'))
-            , ("6 - ERROR", RE.AnySymbol)
+                (RE.fromWord "--" `RE.concat` re_az_star `RE.concat` RE.Symbol '\n')) DiscardToken
+            , TokenDefinition "ERROR" RE.AnySymbol KeepTokenAndMatch
             ]
 
-printResult scanner program = putStr $ matchResultToString $ scanner program
+printResult :: (String -> SimpleResult) -> String -> IO ()
+printResult scanner program = putStr $ matchResultToString $ {- fmap (take 2) $ -} scanner program
 
 testPrograms =
-    [ "wello world"
+    [ "hello world"
     , "hello123"
     , "I contain an exclamation mark!"
     ]
@@ -63,6 +74,7 @@ lectureExamplePrograms =
     , "--hello world\n"
     ]
 
+printTestResults :: (String -> SimpleResult) -> [String] -> IO ()
 printTestResults scanner = 
     mapM_ (\x -> do
         putStr $ "===     Program     ===\n" ++ x ++ "\n\n=== Scanner results ===\n";
@@ -89,6 +101,8 @@ showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
 
 --  Simple Grammar for sequential prints  --
 
+{-
+
 data SequentialPrintTokenName
     = SPTNPrint
     | SPTNOpenParen
@@ -110,8 +124,8 @@ sequentialPrintUnescape [] = []
 sequentialPrintUnescape ('\\':x:xs) = x:sequentialPrintUnescape xs
 sequentialPrintUnescape (x:xs) = x:sequentialPrintUnescape xs
 
-sequentialPrintScan :: String -> Either (Scanner.Error Char) [PositionInformation SequentialPrintToken]
-sequentialPrintScan = Scanner.scan (Map.fromList tokenDefs) postProcess (=='\n')
+sequentialPrintScan :: String -> Error.Result Char (Tokens SequentialPrintToken Char)
+sequentialPrintScan = Scanner.scan (=='\n') tokenDefs
     where
         postProcess (Scanner.Match _ SPTNPrint) = Just SPPrint
         postProcess (Scanner.Match _ SPTNOpenParen) = Just SPOpenParen
@@ -170,3 +184,5 @@ nodeTree1 = ST.NodeSyntaxTree tree1
 tree1nodes = F.foldr (:) [] nodeTree1
 tree2 = fmap (:"-Leaf") tree1
 nodeTree2 = fmap (*2) nodeTree1
+
+-}

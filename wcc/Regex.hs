@@ -181,7 +181,7 @@ anyBut chars = AnySymbol `difference` anyOf chars
 
 --    Regex matching    --
 
-matchesEmptyWord :: Eq alphabet => Regex alphabet -> Bool
+matchesEmptyWord :: Regex alphabet -> Bool
 matchesEmptyWord EmptyWord = True
 -- Repeating 0 times yields the empty word
 matchesEmptyWord (Repeat _) = True

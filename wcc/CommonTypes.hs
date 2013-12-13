@@ -1,7 +1,6 @@
 module CommonTypes
     -- A position in a file (i.e. a long word containing linebreaks)
     ( Position(..)
-    -- 
     , incChar
     , incLine
     , positionToString
@@ -26,4 +25,3 @@ incLine (Position line char) = Position (line + 1) 1
 
 positionToString :: Position -> String
 positionToString (Position line char) = show line ++ ":" ++ show char
-
