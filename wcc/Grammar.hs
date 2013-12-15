@@ -7,7 +7,7 @@ module Grammar
 
 import qualified Data.Map as Map
 
-data Grammar terminals symbols productionNames = Grammar
+data Grammar terminals productionNames symbols = Grammar
     { startSymbol :: symbols
     , productions :: Map.Map productionNames (Production terminals symbols)
     }

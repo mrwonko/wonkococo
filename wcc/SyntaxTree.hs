@@ -7,37 +7,39 @@ module SyntaxTree
 import Data.Foldable (Foldable, foldMap)
 import Data.Monoid (mconcat, mempty, mappend)
 import Data.Functor (Functor, fmap)
+import Token
 
-data SyntaxTree nodes leafs
-    = Node nodes [SyntaxTree nodes leafs]
-    | Leaf leafs
+data SyntaxTree alphabet productionNames tokenNames
+    = Node productionNames [SyntaxTree alphabet productionNames tokenNames]
+    | Leaf (Token tokenNames alphabet)
     deriving (Eq, Show)
 
 --    Definitions for folding and mapping (i.e. Functor and Foldable instances)    --
 
 -- Mapping over leafs
-instance Functor (SyntaxTree nodes) where
-    fmap f (Leaf l) = Leaf $ f l
-    fmap f (Node node forest) = Node node $ map (fmap f) forest
+instance Functor (SyntaxTree alphabet productionNames) where
+    fmap f (Leaf token@Token{}) = Leaf $ token { tName = f $ tName token }
+    fmap f (Node productionName forest) = Node productionName $ map (fmap f) forest
 
 -- Folding leafs
-instance Foldable (SyntaxTree nodes) where
-    foldMap f (Leaf l) = f l
+instance Foldable (SyntaxTree alphabet productionNames) where
+    foldMap f (Leaf token@Token{}) = f $ tName token
     foldMap f (Node _ forest) = mconcat $ map (foldMap f) forest
 
 
 -- SyntaxTree with flipped type parameters
 
-newtype NodeSyntaxTree leafs nodes = NodeSyntaxTree {fromNodeSyntaxTree :: SyntaxTree nodes leafs} deriving (Eq, Show)
+newtype NodeSyntaxTree alphabet tokenNames productionNames
+    = NodeSyntaxTree {fromNodeSyntaxTree :: SyntaxTree alphabet productionNames tokenNames } deriving (Eq, Show)
 
 -- Mapping over nodes
-instance Functor (NodeSyntaxTree leafs) where
+instance Functor (NodeSyntaxTree alphabet tokenNames) where
     fmap f (NodeSyntaxTree (Leaf l)) = NodeSyntaxTree $ Leaf l
-    fmap f (NodeSyntaxTree (Node node forest))
-        = NodeSyntaxTree $ Node (f node) $ map (fromNodeSyntaxTree . fmap f . NodeSyntaxTree) forest
+    fmap f (NodeSyntaxTree (Node productionName forest))
+        = NodeSyntaxTree $ Node (f productionName) $ map (fromNodeSyntaxTree . fmap f . NodeSyntaxTree) forest
 
 -- Folding nodes
-instance Foldable (NodeSyntaxTree leafs) where
+instance Foldable (NodeSyntaxTree alphabet tokenNames) where
     foldMap f (NodeSyntaxTree (Leaf _)) = mempty
-    foldMap f (NodeSyntaxTree (Node node forest))
-        = f node `mappend` mconcat ( map (foldMap f . NodeSyntaxTree) forest)
+    foldMap f (NodeSyntaxTree (Node productionName forest))
+        = f productionName `mappend` mconcat ( map (foldMap f . NodeSyntaxTree) forest)

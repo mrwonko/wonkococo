@@ -15,27 +15,30 @@ import Control.Applicative ( (<$>) )
 import Control.Monad ( mapM )
 import qualified Data.Map as Map
 
-type SyntaxTreeWithEOF productionNames terminals
-    = SyntaxTree (ProductionNamesAndStart productionNames) (TerminalsAndEOF terminals)
+type SyntaxTreeWithEOF alphabet productionNames tokenNames
+    = SyntaxTree alphabet (ProductionNamesAndStart productionNames) (TerminalsAndEOF tokenNames)
 
 syntaxTreeWithoutEOF
-    :: SyntaxTreeWithEOF productionNames (Token tokenNames alphabet)
-    -> Result alphabet (SyntaxTree productionNames (Token tokenNames alphabet))
+    :: SyntaxTreeWithEOF alphabet productionNames tokenNames
+    -> Result alphabet (SyntaxTree alphabet productionNames tokenNames)
 
--- EOF leaf? shouldn't be there, EOFTerminal is a DiscardableTerminal.
-syntaxTreeWithoutEOF (Leaf EOFTerminal)
+-- Shouldn't be called with EOFTerminal Leaf, no way to remove that
+syntaxTreeWithoutEOF (Leaf (Token EOFTerminal _ _))
     = Left $ AssertionError "syntaxTreeWithoutEOF called on an invalid syntax tree with an EOF leaf"
 
 -- Normal leaf
-syntaxTreeWithoutEOF (Leaf (NormalTerminal terminal))
-    = Right $ Leaf terminal
+syntaxTreeWithoutEOF (Leaf token@(Token (NormalTerminal tokenName) _ _))
+    = Right $ Leaf $ token { tName = tokenName }
 
 -- Start production
+syntaxTreeWithoutEOF (Node StartProductionName [child, Leaf (Token EOFTerminal _ _)])
+    = syntaxTreeWithoutEOF child
 syntaxTreeWithoutEOF (Node StartProductionName [child])
     = syntaxTreeWithoutEOF child
 -- Start production should only have one child since the terminal EOF following it is discardable.
 syntaxTreeWithoutEOF (Node StartProductionName _)
-    = Left $ AssertionError "syntaxTreeWithoutEOF called on an invalid syntax tree with a StartProduction node with multiple/0 children"
+    = Left $ AssertionError
+        "syntaxTreeWithoutEOF called on an invalid syntax tree with a StartProduction node with an invalid number of children"
 
 -- Normal production
 syntaxTreeWithoutEOF (Node (NormalProductionName productionName) children)
@@ -44,11 +47,11 @@ syntaxTreeWithoutEOF (Node (NormalProductionName productionName) children)
 -- Discards what's discardable. Side-effect of verifying the tree matches the productions.
 simplifySyntaxTree :: (Ord productionNames, Eq tokenNames, Eq symbols)
     -- Grammar which defines discardable productions and terminals
-    => Grammar (Token tokenNames alphabet) symbols productionNames
+    => Grammar (Token tokenNames alphabet) productionNames symbols
     -- Tree to simplify
-    -> SyntaxTree productionNames (Token tokenNames alphabet)
+    -> SyntaxTree alphabet productionNames tokenNames
     -- Simplified tree
-    -> Result alphabet (SyntaxTree productionNames (Token tokenNames alphabet))
+    -> Result alphabet (SyntaxTree alphabet productionNames tokenNames)
 simplifySyntaxTree _ (Leaf _) = Left $ AssertionError "simplifySyntaxTree: Called on leaf, which is no valid syntax tree!"
 simplifySyntaxTree grammar node = do
     list <- simplifySyntaxTree' grammar (startSymbol grammar) True node
@@ -61,15 +64,15 @@ simplifySyntaxTree grammar node = do
 -- otherwise returns [simplified node]
 simplifySyntaxTree' :: (Ord productionNames, Eq tokenNames, Eq symbols)
     -- Grammar which defines discardable productions and terminals
-    => Grammar (Token tokenNames alphabet) symbols productionNames
+    => Grammar (Token tokenNames alphabet) productionNames symbols
     -- Symbol the current node must match
     -> symbols
     -- Whether this is the root node
     -> Bool
     -- Tree to simplify
-    -> SyntaxTree productionNames (Token tokenNames alphabet)
+    -> SyntaxTree alphabet productionNames tokenNames
     -- Simplified tree
-    -> Result alphabet [(SyntaxTree productionNames (Token tokenNames alphabet))]
+    -> Result alphabet [SyntaxTree alphabet productionNames tokenNames]
 simplifySyntaxTree' _ _ _ (Leaf _) = Left $ AssertionError "simplifySyntaxTree' called on Leaf!"
 simplifySyntaxTree' grammar symbol isRoot (Node productionName children) = do
     production <- lookupProduction productionName grammar
@@ -91,30 +94,30 @@ simplifySyntaxTree' grammar symbol isRoot (Node productionName children) = do
 
 lookupProduction :: (Ord productionNames)
     => productionNames
-    => Grammar (Token tokenNames alphabet) symbols productionNames
+    => Grammar (Token tokenNames alphabet) productionNames symbols
     -> Result alphabet (Production (Token tokenNames alphabet) symbols)
 lookupProduction productionName grammar = maybeToEither
     (AssertionError "simplifySyntaxTree: syntax tree contains production name that's not in the grammar")
     $ Map.lookup productionName (productions grammar)
 
 simplifyNodeForest :: (Ord productionNames, Eq tokenNames, Eq symbols)
-    => Grammar (Token tokenNames alphabet) symbols productionNames
+    => Grammar (Token tokenNames alphabet) productionNames symbols
     -- Which production's forest is this?
     -> productionName
     -> Production (Token tokenNames alphabet) symbols
     -- What to simplify?
-    -> [SyntaxTree productionNames (Token tokenNames alphabet)]
-    -> Result alphabet [SyntaxTree productionNames (Token tokenNames alphabet)]
+    -> [SyntaxTree alphabet productionNames tokenNames]
+    -> Result alphabet [SyntaxTree alphabet productionNames tokenNames]
 simplifyNodeForest grammar prodName production forest = do
     children <- sequence $ simplifyNodeForest' grammar (productionString production) forest
     return children
 
 simplifyNodeForest' :: (Ord productionNames, Eq tokenNames, Eq symbols)
-    => Grammar (Token tokenNames alphabet) symbols productionNames
+    => Grammar (Token tokenNames alphabet) productionNames symbols
     -- Production string this should match
     -> [ProductionElement (Token tokenNames alphabet) symbols]
-    -> [SyntaxTree productionNames (Token tokenNames alphabet)]
-    -> [Result alphabet (SyntaxTree productionNames (Token tokenNames alphabet))]
+    -> [SyntaxTree alphabet productionNames tokenNames]
+    -> [Result alphabet (SyntaxTree alphabet productionNames tokenNames)]
 simplifyNodeForest' _ [] [] = []
 simplifyNodeForest' _ _ [] = [Left $ AssertionError "Syntax Tree does not match production; Node with too few children"]
 simplifyNodeForest' _ [] _ = [Left $ AssertionError "Syntax Tree does not match production; Node with too many children"]
@@ -134,10 +137,10 @@ differingSymbolError :: Result a b
 differingSymbolError = Left $ AssertionError "Syntax Tree does not match production; Differing Symbols"
 
 simplifyNodeTree :: (Ord productionNames, Eq tokenNames, Eq symbols)
-    => Grammar (Token tokenNames alphabet) symbols productionNames
+    => Grammar (Token tokenNames alphabet) productionNames symbols
     -> ProductionElement (Token tokenNames alphabet) symbols
-    -> SyntaxTree productionNames (Token tokenNames alphabet)
-    -> [Result alphabet (SyntaxTree productionNames (Token tokenNames alphabet))]
+    -> SyntaxTree alphabet productionNames tokenNames
+    -> [Result alphabet (SyntaxTree alphabet productionNames tokenNames)]
 simplifyNodeTree grammar (Terminal _) (Node _ _)
     = [expectedTerminalError]
 simplifyNodeTree grammar (DiscardableTerminal _) (Node _ _)

@@ -4,6 +4,8 @@ module GrammarDetails where
 
 import Grammar
 import qualified Data.Map as Map
+import Token
+import CommonTypes ( Position(..) )
 
 data TerminalsAndEOF terminals
     = NormalTerminal terminals
@@ -22,8 +24,8 @@ data ProductionNamesAndStart productionNames
 
 grammarWithEOF
     :: Ord productionNames
-    => Grammar terminals symbols productionNames
-    -> Grammar (TerminalsAndEOF terminals) (SymbolsAndStart symbols) (ProductionNamesAndStart productionNames)
+    => Grammar terminals productionNames symbols
+    -> Grammar (TerminalsAndEOF terminals) (ProductionNamesAndStart productionNames) (SymbolsAndStart symbols)
 grammarWithEOF (Grammar startSymbol productions)
     = Grammar StartSymbol newProductions
     where
@@ -42,5 +44,7 @@ grammarWithEOF (Grammar startSymbol productions)
         convertProductionElement (Symbol i) = Symbol $ NormalSymbol i
         convertProductionElement (DiscardableTerminal t) = DiscardableTerminal $ NormalTerminal t
 
-terminalsWithEOF :: [terminals] -> [TerminalsAndEOF terminals]
-terminalsWithEOF = (++ [EOFTerminal]) . map NormalTerminal
+tokensWithEOF :: [Token tokenNames alphabet] -> [Token (TerminalsAndEOF tokenNames) alphabet]
+tokensWithEOF = (++ [Token EOFTerminal Nothing (Position (-1) (-1))]) . map convertToken
+    where
+        convertToken token = token { tName = NormalTerminal $ tName token}

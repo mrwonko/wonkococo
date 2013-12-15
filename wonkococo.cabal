@@ -72,5 +72,6 @@ library
   other-modules:       
                        GrammarDetails,
                        SyntaxTreeDetails,
-                       Helpers
+                       Helpers,
+                       ParserDetails
   

@@ -1,5 +1,10 @@
 module Parser where
 
+import SyntaxTree
+import Grammar
+import Token
+import Error
+
 {-
     Generate an Abstract Syntax Tree, i.e. drop irrelevant tokens:
     
@@ -12,3 +17,8 @@ module Parser where
     But usually it's something like Factor ::= "(" Expression ")"
     So annotation seems more feasible than automation.
 -}
+
+type Parser alphabet tokenNames productionNames symbols
+    = Grammar tokenNames productionNames symbols
+    -> Tokens tokenNames alphabet
+    -> Result alphabet (SyntaxTree alphabet productionNames tokenNames)

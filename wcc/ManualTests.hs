@@ -10,6 +10,8 @@ import Data.Char (isAscii, isPrint, ord, chr)
 import qualified Data.Foldable as F
 import qualified Error
 import Token
+import qualified GrammarDetails as GD
+import qualified SyntaxTreeDetails as STD
 
 runTests = foldl (>>) (return ()) tests
 
@@ -93,7 +95,15 @@ printTestResults scanner =
 
 -- Just a simple grammar to test show
 
-data ShowMeGrammarTerminals = SMGTNumber | SMGTPlus deriving (Enum, Show)
+{-
+TODO: turn this into <Sum> ::= <Term> <Sum2> where Sum2 has an espilon production, esp. wrt. the code!
+<Sum>  ::= <Term>            // SingleSum
+<Sum>  ::= <Term> Plus <Sum> // MultiSum
+<Term> ::= Number            // Number
+-}
+
+data ShowMeGrammarTokenNames = SMGTNNumber | SMGTNPlus deriving (Enum, Show)
+type ShowMeGrammarTerminals = Token ShowMeGrammarTokenNames Char
 data ShowMeGrammarSymbols = SMGSSum | SMGSTerm deriving (Eq, Show)
 data ShowMeGrammarProductions = SMGPSingleSum | SMGPMultiSum | SMGPNumber deriving (Ord, Eq, Enum, Show)
 showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
@@ -103,14 +113,27 @@ showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
       )
     -- careful: no left recursion, thus SMGSSum must not come first
     , ( SMGPMultiSum
-      , Grammar.Production SMGSSum False [Grammar.Symbol SMGSTerm, Grammar.DiscardableTerminal SMGTPlus, Grammar.Symbol SMGSSum]
+      , Grammar.Production SMGSSum False [Grammar.Symbol SMGSTerm, Grammar.DiscardableTerminal SMGTNPlus, Grammar.Symbol SMGSSum]
       )
     -- A number is always just a number terminal so it can be simplified to that
     -- (so the abstract syntax tree could be as small as a single leaf)
     , ( SMGPNumber
-      , Grammar.Production SMGSTerm True [Grammar.Terminal SMGTNumber]
+      , Grammar.Production SMGSTerm True [Grammar.Terminal SMGTNNumber]
       )
     ]
+
+-- Some trees for the above grammar
+
+showMeGrammarTree1EOF =
+    ST.Node GD.StartProductionName
+    [ ST.Node (GD.NormalProductionName SMGPMultiSum)
+        [
+        ]
+    , ST.Leaf (Token GD.EOFTerminal Nothing (Position 1 1))
+    ]
+showMeGrammarTree1 = STD.syntaxTreeWithoutEOF showMeGrammarTree1EOF
+
+
 
 --    Parser Test    --
 
@@ -178,35 +201,7 @@ testSequentialPrint = sequentialPrintPostScan
 
 {-
     (Throw whitespace away during scanning)
-    Block := Statement | Statement Block
-    Statement := PrintKeyword OpenParen StringLiteral CloseParen
+    Block ::= epsilon | Statement Block'
+    Block' ::= epsilon | Block
+    Statement ::= PrintKeyword OpenParen StringLiteral CloseParen
 -}
-
-data SequentialPrintBlock
-    -- stmt
-    = SPBStatement SequentialPrintStatement
-    -- stmt block
-    | SPBBlock SequentialPrintStatement SequentialPrintBlock
-
-data SequentialPrintStatement
-    -- print("...")
-    = SPSPrint String
-
-data T1 a = T1
-
-test :: T1 (T1 (T1 ()))
-test = T1
-
-{-
-sequentialPrintGrammar :: Grammar.Grammar 
-sequentialPrintGrammar = Grammar.Grammar
--}
-
---    Syntax Tree Tests    --
-
-tree1 = ST.Node 1 [ST.Leaf 'A', ST.Leaf 'B', ST.Node 2 [], ST.Node 3 [ST.Leaf 'C']]
-tree1leaves = F.foldr (:) [] tree1
-nodeTree1 = ST.NodeSyntaxTree tree1
-tree1nodes = F.foldr (:) [] nodeTree1
-tree2 = fmap (:"-Leaf") tree1
-nodeTree2 = fmap (*2) nodeTree1
