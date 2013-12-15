@@ -69,5 +69,8 @@ library
                        Token,
                        Error,
                        TokenParser
-  other-modules:       GrammarDetails
+  other-modules:       
+                       GrammarDetails,
+                       SyntaxTreeDetails,
+                       Helpers
   

@@ -2,12 +2,10 @@ module Grammar
     ( Grammar (..)
     , ProductionElement (..)
     , Production (..)
+    , isDiscardable
     ) where
 
 import qualified Data.Map as Map
-
--- TODO: Some productions are irrelevant (notably grouping parentheses), have some way to define those!
--- (see difference Parse Tree <-> Abstract Syntax Tree)
 
 data Grammar terminals symbols productionNames = Grammar
     { startSymbol :: symbols
@@ -18,6 +16,7 @@ data Production terminals symbols
     = Production
     { productionSymbol :: symbols
     -- Some productions serve only to define precedence, which is unambiguous in a tree, so they can be discarded
+    -- Those must not have more than 1 non-discardable production element
     , productionDiscardable :: Bool
     , productionString :: [ProductionElement terminals symbols]
     }
@@ -52,3 +51,7 @@ instance (Show terminals, Show symbols, Eq symbols, Show productionNames, Ord pr
             concatProduction accum productionName production
                 = accum ++ "\n" ++ show productionName ++ ":\n  "
                 ++ show production
+
+isDiscardable :: ProductionElement terminals symbols -> Bool
+isDiscardable (DiscardableTerminal _) = True
+isDiscardable _ = False

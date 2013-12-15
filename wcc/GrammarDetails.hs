@@ -4,11 +4,6 @@ module GrammarDetails where
 
 import Grammar
 import qualified Data.Map as Map
-import SyntaxTree
-import Error
-import Token
-import Control.Applicative ((<$>))
-import Control.Monad (mapM)
 
 data TerminalsAndEOF terminals
     = NormalTerminal terminals
@@ -49,29 +44,3 @@ grammarWithEOF (Grammar startSymbol productions)
 
 terminalsWithEOF :: [terminals] -> [TerminalsAndEOF terminals]
 terminalsWithEOF = (++ [EOFTerminal]) . map NormalTerminal
-
-type SyntaxTreeWithEOF productionNames terminals
-    = SyntaxTree (ProductionNamesAndStart productionNames) (TerminalsAndEOF terminals)
-
-syntaxTreeWithoutEOF
-    :: SyntaxTreeWithEOF productionNames (Tokens tokenNames alphabet)
-    -> Result alphabet (SyntaxTree productionNames (Tokens tokenNames alphabet))
-
--- EOF leaf? shouldn't be there, EOFTerminal is a DiscardableTerminal.
-syntaxTreeWithoutEOF (Leaf EOFTerminal)
-    = Left $ AssertionError "syntaxTreeWithoutEOF called on an invalid syntax tree with an EOF leaf"
-
--- Normal leaf
-syntaxTreeWithoutEOF (Leaf (NormalTerminal terminal))
-    = Right $ Leaf terminal
-
--- Start production
-syntaxTreeWithoutEOF (Node StartProductionName [child])
-    = syntaxTreeWithoutEOF child
--- Start production should only have one child since the terminal EOF following it is discardable.
-syntaxTreeWithoutEOF (Node StartProductionName _)
-    = Left $ AssertionError "syntaxTreeWithoutEOF called on an invalid syntax tree with a StartProduction node with multiple/0 children"
-
--- Normal production
-syntaxTreeWithoutEOF (Node (NormalProductionName productionName) children)
-    = Node productionName <$> mapM syntaxTreeWithoutEOF children
