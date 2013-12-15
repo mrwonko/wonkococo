@@ -129,7 +129,7 @@ showMeGrammarTree1EOF =
     [ ST.Node (GD.NormalProductionName SMGPMultiSum)
         [
         ]
-    , ST.Leaf (Token GD.EOFTerminal Nothing (Position 1 1))
+    , ST.Leaf (Token GD.EOFTerminal Nothing (Position (-1) (-1)))
     ]
 showMeGrammarTree1 = STD.syntaxTreeWithoutEOF showMeGrammarTree1EOF
 
