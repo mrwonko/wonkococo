@@ -67,6 +67,7 @@ library
                        SyntaxTree,
                        Parser,
                        Token,
-                       Error
+                       Error,
+                       TokenParser
   other-modules:       GrammarDetails
   

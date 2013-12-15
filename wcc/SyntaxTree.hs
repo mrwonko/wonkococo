@@ -1,7 +1,7 @@
 module SyntaxTree
     ( SyntaxTree ( Node, Leaf )
     , NodeSyntaxTree ( NodeSyntaxTree )
-    , getSyntaxTree
+    , fromNodeSyntaxTree
     )where
 
 import Data.Foldable (Foldable, foldMap)
@@ -25,14 +25,19 @@ instance Foldable (SyntaxTree nodes) where
     foldMap f (Leaf l) = f l
     foldMap f (Node _ forest) = mconcat $ map (foldMap f) forest
 
-newtype NodeSyntaxTree leafs nodes = NodeSyntaxTree {getSyntaxTree :: SyntaxTree nodes leafs} deriving (Eq, Show)
+
+-- SyntaxTree with flipped type parameters
+
+newtype NodeSyntaxTree leafs nodes = NodeSyntaxTree {fromNodeSyntaxTree :: SyntaxTree nodes leafs} deriving (Eq, Show)
 
 -- Mapping over nodes
 instance Functor (NodeSyntaxTree leafs) where
     fmap f (NodeSyntaxTree (Leaf l)) = NodeSyntaxTree $ Leaf l
-    fmap f (NodeSyntaxTree (Node node forest)) = NodeSyntaxTree $ Node (f node) $ map (getSyntaxTree . fmap f . NodeSyntaxTree) forest
+    fmap f (NodeSyntaxTree (Node node forest))
+        = NodeSyntaxTree $ Node (f node) $ map (fromNodeSyntaxTree . fmap f . NodeSyntaxTree) forest
 
 -- Folding nodes
 instance Foldable (NodeSyntaxTree leafs) where
     foldMap f (NodeSyntaxTree (Leaf _)) = mempty
-    foldMap f (NodeSyntaxTree (Node node forest)) = f node `mappend` mconcat ( map (foldMap f . NodeSyntaxTree) forest)
+    foldMap f (NodeSyntaxTree (Node node forest))
+        = f node `mappend` mconcat ( map (foldMap f . NodeSyntaxTree) forest)

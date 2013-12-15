@@ -97,10 +97,19 @@ data ShowMeGrammarTerminals = SMGTNumber | SMGTPlus deriving (Enum, Show)
 data ShowMeGrammarSymbols = SMGSSum | SMGSTerm deriving (Eq, Show)
 data ShowMeGrammarProductions = SMGPSingleSum | SMGPMultiSum | SMGPNumber deriving (Ord, Eq, Enum, Show)
 showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
-    [ (SMGPSingleSum, (SMGSSum, [Grammar.Symbol SMGSTerm]))
-    -- careful: no left recursion, thus SMGSSum may not come first
-    , (SMGPMultiSum, (SMGSSum, [Grammar.Symbol SMGSTerm, Grammar.Terminal SMGTPlus, Grammar.Symbol SMGSSum]))
-    , (SMGPNumber, (SMGSTerm, [Grammar.Terminal SMGTNumber]))
+    -- A sum that is just one term contains no additional information so it's discardable
+    [ ( SMGPSingleSum
+      , Grammar.Production SMGSSum True [Grammar.Symbol SMGSTerm]
+      )
+    -- careful: no left recursion, thus SMGSSum must not come first
+    , ( SMGPMultiSum
+      , Grammar.Production SMGSSum False [Grammar.Symbol SMGSTerm, Grammar.DiscardableTerminal SMGTPlus, Grammar.Symbol SMGSSum]
+      )
+    -- A number is always just a number terminal so it can be simplified to that
+    -- (so the abstract syntax tree could be as small as a single leaf)
+    , ( SMGPNumber
+      , Grammar.Production SMGSTerm True [Grammar.Terminal SMGTNumber]
+      )
     ]
 
 --    Parser Test    --

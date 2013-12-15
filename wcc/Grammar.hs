@@ -1,6 +1,7 @@
 module Grammar
-    ( Grammar( Grammar )
-    , TerminalOrSymbol( Terminal, Symbol )
+    ( Grammar (..)
+    , ProductionElement (..)
+    , Production (..)
     ) where
 
 import qualified Data.Map as Map
@@ -10,29 +11,44 @@ import qualified Data.Map as Map
 
 data Grammar terminals symbols productionNames = Grammar
     { startSymbol :: symbols
-    , productions :: Map.Map productionNames (symbols, [TerminalOrSymbol terminals symbols])
+    , productions :: Map.Map productionNames (Production terminals symbols)
     }
 
-data TerminalOrSymbol terminals symbols
+data Production terminals symbols
+    = Production
+    { productionSymbol :: symbols
+    -- Some productions serve only to define precedence, which is unambiguous in a tree, so they can be discarded
+    , productionDiscardable :: Bool
+    , productionString :: [ProductionElement terminals symbols]
+    }
+
+data ProductionElement terminals symbols
     = Terminal terminals
-    | IrrelevantTerminal terminals
+    -- Many terminals are only used in one production so the productionName uniquely identifies the result and they are discardable
+    | DiscardableTerminal terminals
     | Symbol symbols
     deriving (Eq)
 
-instance (Show terminals, Show symbols) => Show (TerminalOrSymbol terminals symbols) where
+instance (Show terminals, Show symbols) => Show (ProductionElement terminals symbols) where
     show (Terminal t) = show t
-    show (IrrelevantTerminal t) = "(" ++ show t ++ ")"
+    show (DiscardableTerminal t) = "(" ++ show t ++ ")"
     show (Symbol s)   = "<"  ++ show s ++ ">"
+
+instance (Show terminals, Show symbols) => Show (Production terminals symbols) where
+    show (Production symbol discardable string) = foldl (\ l r -> l ++ " " ++ show r) accum string
+        where accum = "<" ++ show symbol ++ ">" ++ if discardable then " (discardable)" else "" ++ " ::="
 
 instance (Show terminals, Show symbols, Eq symbols, Show productionNames, Ord productionNames)
     => Show (Grammar terminals symbols productionNames) where
     show (Grammar startSymbol productions)
         = Map.foldlWithKey concatProduction
         (   Map.foldlWithKey concatProduction "==  Grammar   ==\n= Start Symbol ="
-            (Map.filter (\(symbol, _) -> symbol == startSymbol) productions)
-        ++ "\n\n=     Rest     =")
-        $ Map.filter (\(symbol, _) -> symbol /= startSymbol) productions
+            (Map.filter isStartProduction productions)
+            ++ "\n\n=     Rest     ="
+        )
+        $ Map.filter (not . isStartProduction) productions
         where
-            concatProduction accum productionName (symbol, production)
+            isStartProduction prod = productionSymbol prod == startSymbol
+            concatProduction accum productionName production
                 = accum ++ "\n" ++ show productionName ++ ":\n  "
-                ++ foldl (\ l r -> l ++ " " ++ show r) ("<" ++ show symbol ++ "> ::=") production
+                ++ show production

@@ -3,8 +3,6 @@ module Token
     , TokenDefinitions
     , TokenType (..)
     , mapTokenDefinitionRegex
-    , parseTokenDefinition
-    , concatParsedTokenDefinitions
     
     , Token (..)
     , Tokens
@@ -12,7 +10,6 @@ module Token
     ) where
 
 import qualified Regex as RE
-import Control.Applicative
 import Error
 import CommonTypes ( Position )
 
@@ -36,14 +33,6 @@ data TokenType = KeepToken | KeepTokenAndMatch | DiscardToken
 
 instance (Show tokenNames, Show alphabet, Eq alphabet) => Show (TokenDefinition tokenNames alphabet) where
     show (TokenDefinition name regex type') = show name ++ " (" ++ show type' ++ ") ::= " ++ show regex
-
--- this could be generalized to any language instead of strings, but why would you?
-parseTokenDefinition :: tokenNames -> String -> TokenType -> Result Char (TokenDefinition tokenNames Char)
-parseTokenDefinition _ _ _ = Left $ NotYetImplementedError "Regex Parsing"
-
-concatParsedTokenDefinitions
-    :: [Result Char (TokenDefinition tokenNames alphabet)] -> Result Char (TokenDefinitions tokenNames alphabet)
-concatParsedTokenDefinitions = foldr (liftA2 (:)) (Right [])
 
 
 --    Token    --
