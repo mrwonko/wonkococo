@@ -1,18 +1,32 @@
 module SyntaxTree
-    ( SyntaxTree ( Node, Leaf )
-    , NodeSyntaxTree ( NodeSyntaxTree )
-    , fromNodeSyntaxTree
+    ( SyntaxTree (..)
+    , NodeSyntaxTree (..)
+    , drawTree
     )where
 
 import Data.Foldable (Foldable, foldMap)
 import Data.Monoid (mconcat, mempty, mappend)
 import Data.Functor (Functor, fmap)
 import Token
+import qualified Data.Tree as Tree
 
 data SyntaxTree alphabet productionNames tokenNames
     = Node productionNames [SyntaxTree alphabet productionNames tokenNames]
     | Leaf (Token tokenNames alphabet)
     deriving (Eq, Show)
+
+toStringTree :: (Show alphabet, Show productionNames, Show tokenNames)
+    => SyntaxTree alphabet productionNames tokenNames
+    -> Tree.Tree String
+toStringTree = Tree.unfoldTree unfold
+    where
+        unfold (Leaf token) = (show token, [])
+        unfold (Node productionName subtree) = (show productionName, subtree)
+
+drawTree :: (Show alphabet, Show productionNames, Show tokenNames)
+    => SyntaxTree alphabet productionNames tokenNames
+    -> String
+drawTree = Tree.drawTree . toStringTree
 
 --    Definitions for folding and mapping (i.e. Functor and Foldable instances)    --
 

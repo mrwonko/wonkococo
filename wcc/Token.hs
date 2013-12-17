@@ -11,7 +11,7 @@ module Token
 
 import qualified Regex as RE
 import Error
-import CommonTypes ( Position )
+import CommonTypes ( Position, positionToString )
 
 
 --    Token Definition    --
@@ -43,9 +43,13 @@ data Token tokenNames alphabet
     , tMatch :: Maybe [alphabet]
     , tPosition :: Position
     }
-    deriving (Eq, Show)
+    deriving (Eq)
 
 type Tokens tokenNames alphabet = [Token tokenNames alphabet]
+
+instance (Show tokenNames, Show alphabet) => Show (Token tokenNames alphabet) where
+    show (Token name Nothing      position) = show name ++ " @" ++ positionToString position
+    show (Token name (Just match) position) = show name ++ " @" ++ positionToString position ++ " " ++ show match
 
 mapTokenMatch :: ([a1] -> [a2]) -> Token tokens a1 -> Token tokens a2
 mapTokenMatch f (Token name match position) = Token name (fmap f match) position

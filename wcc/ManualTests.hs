@@ -12,6 +12,10 @@ import qualified Error
 import Token
 import qualified GrammarDetails as GD
 import qualified SyntaxTreeDetails as STD
+-- TODO: Remove either from package dependencies once this is no longer needed
+import Control.Monad.Trans.Either (EitherT (..))
+import Control.Monad.Trans (lift)
+import Control.Monad (liftM)
 
 runTests = foldl (>>) (return ()) tests
 
@@ -96,44 +100,71 @@ printTestResults scanner =
 -- Just a simple grammar to test show
 
 {-
-TODO: turn this into <Sum> ::= <Term> <Sum2> where Sum2 has an espilon production, esp. wrt. the code!
-<Sum>  ::= <Term>            // SingleSum
-<Sum>  ::= <Term> Plus <Sum> // MultiSum
-<Term> ::= Number            // Number
+<Sum>  ::= <Term> <Sum2> // Sum
+<Sum2> ::=               // Sum2Epsilon
+<Sum2> ::= Plus <Sum>    // Sum2Sum
+<Term> ::= Number        // Number
 -}
 
-data ShowMeGrammarTokenNames = SMGTNNumber | SMGTNPlus deriving (Enum, Show)
+data ShowMeGrammarTokenNames = SMGTNNumber | SMGTNPlus deriving (Enum, Show, Eq)
 type ShowMeGrammarTerminals = Token ShowMeGrammarTokenNames Char
-data ShowMeGrammarSymbols = SMGSSum | SMGSTerm deriving (Eq, Show)
-data ShowMeGrammarProductions = SMGPSingleSum | SMGPMultiSum | SMGPNumber deriving (Ord, Eq, Enum, Show)
+data ShowMeGrammarSymbols = SMGSSum | SMGSSum2 | SMGSTerm deriving (Eq, Show)
+data ShowMeGrammarProductions = SMGPSum | SMGPSum2Epsilon | SMGPSum2Sum | SMGPTermNumber deriving (Ord, Eq, Enum, Show)
 showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
-    -- A sum that is just one term contains no additional information so it's discardable
-    [ ( SMGPSingleSum
-      , Grammar.Production SMGSSum True [Grammar.Symbol SMGSTerm]
+    -- <Sum> ::= <Term> <Sum2>
+    [ ( SMGPSum
+      , Grammar.Production SMGSSum True [Grammar.Symbol SMGSTerm, Grammar.Symbol SMGSSum2]
       )
+    -- <Sum2> ::=
+    , ( SMGPSum2Epsilon
+      , Grammar.Production SMGSSum2 True []
+      )
+    -- <Sum2> ::= Plus <Sum>
     -- careful: no left recursion, thus SMGSSum must not come first
-    , ( SMGPMultiSum
-      , Grammar.Production SMGSSum False [Grammar.Symbol SMGSTerm, Grammar.DiscardableTerminal SMGTNPlus, Grammar.Symbol SMGSSum]
+    , ( SMGPSum2Sum
+      , Grammar.Production SMGSSum2 True [Grammar.DiscardableTerminal SMGTNPlus, Grammar.Symbol SMGSSum]
       )
+    -- <Term> ::= Number
     -- A number is always just a number terminal so it can be simplified to that
     -- (so the abstract syntax tree could be as small as a single leaf)
-    , ( SMGPNumber
+    , ( SMGPTermNumber
       , Grammar.Production SMGSTerm True [Grammar.Terminal SMGTNNumber]
       )
     ]
 
 -- Some trees for the above grammar
 
+showMeGrammarTree1EOF :: STD.SyntaxTreeWithEOF Char ShowMeGrammarProductions ShowMeGrammarTokenNames
 showMeGrammarTree1EOF =
     ST.Node GD.StartProductionName
-    [ ST.Node (GD.NormalProductionName SMGPMultiSum)
-        [
+    [ ST.Node (GD.NormalProductionName SMGPSum)
+        [ -- this isn't a valid tree, but it's enough to undo EOF
         ]
     , ST.Leaf (Token GD.EOFTerminal Nothing (Position (-1) (-1)))
     ]
 showMeGrammarTree1 = STD.syntaxTreeWithoutEOF showMeGrammarTree1EOF
 
+-- "42 + 1337"
+showMeGrammarTree2 =
+    ST.Node SMGPSum
+        [ ST.Node SMGPTermNumber
+            [ ST.Leaf (Token SMGTNNumber (Just "42") (Position 1 1))
+            ]
+        , ST.Node SMGPSum2Sum
+            [ ST.Leaf (Token SMGTNPlus Nothing (Position 1 4))
+            , ST.Node SMGPSum
+                [ ST.Node SMGPTermNumber
+                    [ ST.Leaf (Token SMGTNNumber (Just "1337") (Position 1 6))
+                    ]
+                , ST.Node SMGPSum2Epsilon []
+                ]
+            ]
+        ]
 
+printSimplifiedTree grammar tree = runEitherT $ do
+    tree <- EitherT $ return $ STD.simplifySyntaxTree grammar tree
+    lift $ putStrLn $ ST.drawTree tree
+    return ()
 
 --    Parser Test    --
 

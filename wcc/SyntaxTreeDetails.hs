@@ -47,7 +47,7 @@ syntaxTreeWithoutEOF (Node (NormalProductionName productionName) children)
 -- Discards what's discardable. Side-effect of verifying the tree matches the productions.
 simplifySyntaxTree :: (Ord productionNames, Eq tokenNames, Eq symbols)
     -- Grammar which defines discardable productions and terminals
-    => Grammar (Token tokenNames alphabet) productionNames symbols
+    => Grammar tokenNames productionNames symbols
     -- Tree to simplify
     -> SyntaxTree alphabet productionNames tokenNames
     -- Simplified tree
@@ -64,7 +64,7 @@ simplifySyntaxTree grammar node = do
 -- otherwise returns [simplified node]
 simplifySyntaxTree' :: (Ord productionNames, Eq tokenNames, Eq symbols)
     -- Grammar which defines discardable productions and terminals
-    => Grammar (Token tokenNames alphabet) productionNames symbols
+    => Grammar tokenNames productionNames symbols
     -- Symbol the current node must match
     -> symbols
     -- Whether this is the root node
@@ -93,17 +93,17 @@ simplifySyntaxTree' grammar symbol isRoot (Node productionName children) = do
 
 lookupProduction :: (Ord productionNames)
     => productionNames
-    => Grammar (Token tokenNames alphabet) productionNames symbols
-    -> Result alphabet (Production (Token tokenNames alphabet) symbols)
+    => Grammar tokenNames productionNames symbols
+    -> Result alphabet (Production tokenNames symbols)
 lookupProduction productionName grammar = maybeToEither
     (AssertionError "simplifySyntaxTree: syntax tree contains production name that's not in the grammar")
     $ Map.lookup productionName (productions grammar)
 
 simplifyNodeForest :: (Ord productionNames, Eq tokenNames, Eq symbols)
-    => Grammar (Token tokenNames alphabet) productionNames symbols
+    => Grammar tokenNames productionNames symbols
     -- Which production's forest is this?
     -> productionName
-    -> Production (Token tokenNames alphabet) symbols
+    -> Production tokenNames symbols
     -- What to simplify?
     -> [SyntaxTree alphabet productionNames tokenNames]
     -> Result alphabet [SyntaxTree alphabet productionNames tokenNames]
@@ -112,9 +112,9 @@ simplifyNodeForest grammar prodName production forest = do
     return children
 
 simplifyNodeForest' :: (Ord productionNames, Eq tokenNames, Eq symbols)
-    => Grammar (Token tokenNames alphabet) productionNames symbols
+    => Grammar tokenNames productionNames symbols
     -- Production string this should match
-    -> [ProductionElement (Token tokenNames alphabet) symbols]
+    -> [ProductionElement tokenNames symbols]
     -> [SyntaxTree alphabet productionNames tokenNames]
     -> [Result alphabet (SyntaxTree alphabet productionNames tokenNames)]
 simplifyNodeForest' _ [] [] = []
@@ -136,8 +136,8 @@ differingSymbolError :: Result a b
 differingSymbolError = Left $ AssertionError "Syntax Tree does not match production; Differing Symbols"
 
 simplifyNodeTree :: (Ord productionNames, Eq tokenNames, Eq symbols)
-    => Grammar (Token tokenNames alphabet) productionNames symbols
-    -> ProductionElement (Token tokenNames alphabet) symbols
+    => Grammar tokenNames productionNames symbols
+    -> ProductionElement tokenNames symbols
     -> SyntaxTree alphabet productionNames tokenNames
     -> [Result alphabet (SyntaxTree alphabet productionNames tokenNames)]
 simplifyNodeTree grammar (Terminal _) (Node _ _)
@@ -147,10 +147,10 @@ simplifyNodeTree grammar (DiscardableTerminal _) (Node _ _)
 simplifyNodeTree grammar (Symbol _) (Leaf _)
     = [expectedSymbolError]
 simplifyNodeTree grammar (Terminal t) (Leaf l)
-    | tName t == tName l = [return $ Leaf l]
+    | t == tName l = [return $ Leaf l]
     | otherwise = [differingTerminalError]
 simplifyNodeTree grammar (DiscardableTerminal t) (Leaf l)
-    | tName t == tName l = [] -- discard
+    | t == tName l = [] -- discard
     | otherwise = [differingTerminalError]
 simplifyNodeTree grammar (Symbol symbol) tree
     = case simplifySyntaxTree' grammar symbol False tree of
