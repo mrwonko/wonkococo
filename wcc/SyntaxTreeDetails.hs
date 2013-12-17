@@ -82,13 +82,12 @@ simplifySyntaxTree' grammar symbol isRoot (Node productionName children) = do
         else do
             simplifiedChildren <- simplifyNodeForest grammar productionName production children
             -- can only discard if we have a parent or there is exactly one child
-            if productionDiscardable production && (not isRoot || not (null simplifiedChildren))
-                then if length simplifiedChildren > 1
-                    then Left InvalidDiscardableProduction
-                    else if null simplifiedChildren -- implies not isRoot
-                        then return []
+            let numChildren = length simplifiedChildren
+            if productionDiscardable production && numChildren <= 1 && (not isRoot || numChildren == 1)
+                then if numChildren == 0 -- implies not isRoot
+                    then return []
                     else -- length simplifiedChildren == 1 
-                        return [head simplifiedChildren]
+                        return simplifiedChildren
                 else -- not discardable
                     return [Node productionName simplifiedChildren]
 
