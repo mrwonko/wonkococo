@@ -161,9 +161,11 @@ showMeGrammarTree2 =
             ]
         ]
 
+printTree tree = putStrLn $ ST.drawTree tree
+
 printSimplifiedTree grammar tree = runEitherT $ do
     tree <- EitherT $ return $ STD.simplifySyntaxTree grammar tree
-    lift $ putStrLn $ ST.drawTree tree
+    lift $ printTree tree
     return ()
 
 --    Parser Test    --

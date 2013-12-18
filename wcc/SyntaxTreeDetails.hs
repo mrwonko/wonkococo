@@ -93,7 +93,7 @@ simplifySyntaxTree' grammar symbol isRoot (Node productionName children) = do
 
 lookupProduction :: (Ord productionNames)
     => productionNames
-    => Grammar tokenNames productionNames symbols
+    -> Grammar tokenNames productionNames symbols
     -> Result alphabet (Production tokenNames symbols)
 lookupProduction productionName grammar = maybeToEither
     (AssertionError "simplifySyntaxTree: syntax tree contains production name that's not in the grammar")
