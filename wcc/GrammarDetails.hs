@@ -1,10 +1,19 @@
-module GrammarDetails where
+module GrammarDetails
+    ( TerminalsAndEOF (..)
+    , SymbolsAndStart (..)
+    , ProductionNamesAndStart (..)
+    , grammarWithEOF
+    , tokensWithEOF
+    , nullables
+    ) where
 
 -- Grammars have to be modified with an additional start symbol, but users need not know that.
 
 import Grammar
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Token
+import Helpers (findFixedPoint)
 import CommonTypes ( Position(..) )
 
 data TerminalsAndEOF terminals
@@ -48,3 +57,31 @@ tokensWithEOF :: [Token tokenNames alphabet] -> [Token (TerminalsAndEOF tokenNam
 tokensWithEOF = (++ [Token EOFTerminal Nothing (Position (-1) (-1))]) . map convertToken
     where
         convertToken token = token { tName = NormalTerminal $ tName token}
+
+productionElementNullable :: (Ord symbols)
+    => Set.Set symbols
+    -> ProductionElement terminals symbols
+    -> Bool
+productionElementNullable _ (Terminal _)             = False
+productionElementNullable _ (DiscardableTerminal _)  = False
+productionElementNullable nullableSymbols (Symbol s) = s `Set.member` nullableSymbols
+
+nullablesIteration :: (Ord symbols) 
+    => [Production terminals symbols]
+    -> Set.Set symbols
+    -> Set.Set symbols
+nullablesIteration prods nullableSymbols = newSymbols `Set.union` nullableSymbols
+    where
+        -- Create a Set
+        newSymbols = Set.fromList
+            -- of the symbols of the productions
+            $ map productionSymbol
+            -- whose strings are nullable
+            $ filter (all (productionElementNullable nullableSymbols) . productionString)
+            -- out of all of them
+            prods
+
+nullables :: (Ord symbols)
+    => Grammar terminals productionNames symbols
+    -> Set.Set symbols
+nullables grammar = findFixedPoint (nullablesIteration $ Map.elems $ productions grammar) Set.empty

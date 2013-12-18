@@ -108,7 +108,7 @@ printTestResults scanner =
 
 data ShowMeGrammarTokenNames = SMGTNNumber | SMGTNPlus deriving (Enum, Show, Eq)
 type ShowMeGrammarTerminals = Token ShowMeGrammarTokenNames Char
-data ShowMeGrammarSymbols = SMGSSum | SMGSSum2 | SMGSTerm deriving (Eq, Show)
+data ShowMeGrammarSymbols = SMGSSum | SMGSSum2 | SMGSTerm deriving (Eq, Show, Ord)
 data ShowMeGrammarProductions = SMGPSum | SMGPSum2Epsilon | SMGPSum2Sum | SMGPTermNumber deriving (Ord, Eq, Enum, Show)
 showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
     -- <Sum> ::= <Term> <Sum2>
