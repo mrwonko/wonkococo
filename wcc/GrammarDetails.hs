@@ -146,7 +146,7 @@ firsts grammar
     prods
     where
         prods = Map.elems $ productions grammar
-        -- Find allthe Terminals at the string start or after nullables
+        -- Find all the Terminals at the string start or after nullables
         firstTerminals [] = Set.empty
         firstTerminals (x:xs) = case x of
             Terminal x -> Set.singleton x
@@ -156,3 +156,23 @@ firsts grammar
                 else Set.empty
         nullable s = s `Set.member` n
         n = nullables grammar -- XXX: would haskell remember the result even if I didn't assign it a name?
+
+-- XXX: WIP alternative implementation of firsts
+{-
+firstsIteration :: (Ord symbols, Ord terminals)
+    => [Production terminals symbols]
+    -> Map.Map (ProductionElement terminals symbols) (Set.Set terminals)
+    -> Map.Map (ProductionElement terminals symbols) (Set.Set terminals)
+
+firsts :: (Ord symbols, Ord terminals)
+    => Grammar terminals productionNames symbols
+    -> Map.Map symbols (Set.Set terminals)
+firsts grammar
+    -- We only care about what Symbols start with.
+    = Map.mapKeys (\Symbol s -> s)
+    $ Map.filterWithKey
+        (\k _ -> case k of
+            Symbol _ -> True
+            _ -> False)
+    $ findFixedPoint (firstsIteration $ Map.elems $ productions grammar) Map.empty
+-}

@@ -28,7 +28,7 @@ data ProductionElement terminals symbols
     -- Many terminals are only used in one production so the productionName uniquely identifies the result and they are discardable
     | DiscardableTerminal terminals
     | Symbol symbols
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 instance (Show terminals, Show symbols) => Show (ProductionElement terminals symbols) where
     show (Terminal t) = show t
