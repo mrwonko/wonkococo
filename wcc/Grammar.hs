@@ -3,6 +3,8 @@ module Grammar
     , ProductionElement (..)
     , Production (..)
     , isDiscardable
+    , isSymbol
+    , fromSymbol
     ) where
 
 import qualified Data.Map as Map
@@ -55,3 +57,10 @@ instance (Show terminals, Show symbols, Eq symbols, Show productionNames, Ord pr
 isDiscardable :: ProductionElement terminals symbols -> Bool
 isDiscardable (DiscardableTerminal _) = True
 isDiscardable _ = False
+
+isSymbol :: ProductionElement terminals symbols -> Bool
+isSymbol (Symbol _) = True
+isSymbol _ = False
+
+fromSymbol :: ProductionElement terminals symbols -> symbols
+fromSymbol (Symbol s) = s

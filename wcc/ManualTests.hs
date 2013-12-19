@@ -106,10 +106,10 @@ printTestResults scanner =
 <Term> ::= Number        // Number
 -}
 
-data ShowMeGrammarTokenNames = SMGTNNumber | SMGTNPlus deriving (Enum, Show, Eq)
+data ShowMeGrammarTokenNames = SMGTNNumber | SMGTNPlus deriving (Enum, Show, Eq, Ord)
 type ShowMeGrammarTerminals = Token ShowMeGrammarTokenNames Char
 data ShowMeGrammarSymbols = SMGSSum | SMGSSum2 | SMGSTerm deriving (Eq, Show, Ord)
-data ShowMeGrammarProductions = SMGPSum | SMGPSum2Epsilon | SMGPSum2Sum | SMGPTermNumber deriving (Ord, Eq, Enum, Show)
+data ShowMeGrammarProductions = SMGPSum | SMGPSum2Epsilon | SMGPSum2Sum | SMGPTermNumber | SMGPTest deriving (Ord, Eq, Enum, Show)
 showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
     -- <Sum> ::= <Term> <Sum2>
     [ ( SMGPSum
@@ -130,6 +130,20 @@ showMeGrammar = Grammar.Grammar SMGSSum $ Map.fromList
     , ( SMGPTermNumber
       , Grammar.Production SMGSTerm True [Grammar.Terminal SMGTNNumber]
       )
+    
+    -- For testing first
+    {-
+    -- <Term> ::= <Sum2> <Sum>
+    , ( SMGPTest
+      , Grammar.Production SMGSTerm True [Grammar.Symbol SMGSSum2, Grammar.Symbol SMGSSum]
+      )
+    --}
+    {-
+    -- <Sum> ::=
+    , ( SMGPTest
+      , Grammar.Production SMGSSum True []
+      )
+    --}
     ]
 
 -- Some trees for the above grammar

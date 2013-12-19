@@ -5,6 +5,7 @@ module GrammarDetails
     , grammarWithEOF
     , tokensWithEOF
     , nullables
+    , firsts
     ) where
 
 -- Grammars have to be modified with an additional start symbol, but users need not know that.
@@ -15,11 +16,12 @@ import qualified Data.Set as Set
 import Token
 import Helpers (findFixedPoint)
 import CommonTypes ( Position(..) )
+import Control.Arrow ( (&&&), first )
 
 data TerminalsAndEOF terminals
     = NormalTerminal terminals
     | EOFTerminal
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 data SymbolsAndStart symbols
     = NormalSymbol symbols
@@ -85,3 +87,72 @@ nullables :: (Ord symbols)
     => Grammar terminals productionNames symbols
     -> Set.Set symbols
 nullables grammar = findFixedPoint (nullablesIteration $ Map.elems $ productions grammar) Set.empty
+
+-- If a given symbol has a first element, which other symbols have that as well?
+firstTransitives :: (Ord symbols)
+    => [Production terminals symbols]
+    -> (symbols -> Bool)
+    -> Map.Map symbols [symbols]
+firstTransitives prods nullable
+    = Map.map Set.toAscList
+    $ Map.fromListWith Set.union
+    -- :: [(Symbol, Set Symbol)]
+    $ concat
+    -- :: [[(Symbol, Set Symbol)]]
+    $ map (\(ls, r) -> map (\ l -> (l, Set.singleton r)) ls)
+    -- :: [([Symbol], Symbol)]
+    $ map (relevantSymbols . productionString &&& productionSymbol)
+    -- of those productions starting with symbols :: [Production]
+    $ filter (isSymbol . head . productionString)
+    -- of those with a nonempty string :: [Production]
+    $ filter (not . null . productionString)
+    -- of all the productions :: [Production]
+    prods
+    where
+        relevantSymbols [] = []
+        relevantSymbols (x:xs) = case x of
+            -- Only symbols are relevant.
+            Symbol s -> if nullable s
+                -- If a symbol is nullable, its successor's first element is relevant, too.
+                then s : relevantSymbols xs
+                else [s]
+            _ -> []
+
+applyFirstTransitives :: (Ord symbols, Ord terminals)
+    => Map.Map symbols [symbols]
+    -> Map.Map symbols (Set.Set terminals)
+    -> Map.Map symbols (Set.Set terminals)
+applyFirstTransitives transitives firsts
+    = Map.unionWith Set.union firsts
+    -- :: Map Symbol (Set Terminal)
+    $ Map.fromListWith Set.union
+    -- :: [(Symbol, Set Terminal)]
+    $ concat
+    -- :: [[(Symbol, Set Terminal)]]
+    $ map (\ (ls, r) -> map (\l -> (l, r)) ls)
+    -- look the transitives up :: [([Symbol], Set Terminal)]
+    $ map (first (\x -> Map.findWithDefault [] x transitives))
+    -- :: [(Symbol, Set Terminal)]
+    $ Map.toAscList firsts
+
+firsts :: (Ord symbols, Ord terminals)
+    => Grammar terminals productionNames symbols
+    -> Map.Map symbols (Set.Set terminals)
+firsts grammar
+    = findFixedPoint (applyFirstTransitives (firstTransitives prods nullable))
+    $ Map.filter (not . Set.null)
+    $ Map.fromListWith Set.union
+    $ map (productionSymbol &&& firstTerminals . productionString)
+    prods
+    where
+        prods = Map.elems $ productions grammar
+        -- Find allthe Terminals at the string start or after nullables
+        firstTerminals [] = Set.empty
+        firstTerminals (x:xs) = case x of
+            Terminal x -> Set.singleton x
+            DiscardableTerminal x -> Set.singleton x
+            Symbol s -> if nullable s
+                then firstTerminals xs
+                else Set.empty
+        nullable s = s `Set.member` n
+        n = nullables grammar -- XXX: would haskell remember the result even if I didn't assign it a name?
